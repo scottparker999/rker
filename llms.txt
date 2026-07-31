@@ -1,11 +1,11 @@
-# Parker
+# Scott Parker
 
-> Brisbane-based builder of small, useful things on the internet.
+> Gold Coast–based systems specialist with 20 years in hospitality and tourism.
+> Full-stack hospitality systems — PMS, RMS, BI, POS, websites, distribution and
+> the integrations between them. Also dabbles in networking, on-premises and
+> cloud surveillance, telephony, AI and automation.
 > Personal home page at rker.me.
 
 ## Contact
 - Email: p@rker.me
-
-## Links
-- GitHub: https://github.com/your-handle
-- LinkedIn: https://www.linkedin.com/in/your-handle
+- LinkedIn: https://www.linkedin.com/in/scott-p-7385b52a/
