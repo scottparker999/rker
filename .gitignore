@@ -1,0 +1,12 @@
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Only relevant if you add tooling later
+node_modules/
+.vercel/
+.wrangler/
