@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Writing — Scott Parker</title>
+<meta name="description" content="Notes on hospitality and tourism systems — PMS, RMS, BI, POS, distribution and the integrations between them.">
+<link rel="canonical" href="https://rker.me/writing/">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Writing — Scott Parker">
+<meta property="og:description" content="Notes on hospitality and tourism systems.">
+<meta property="og:url" content="https://rker.me/writing/">
+<meta property="og:image" content="https://rker.me/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+<noscript><style>.reveal{opacity:1 !important;transform:none !important}</style></noscript>
+
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <a class="home" href="/">P<span class="at">@</span>rker</a>
+    <nav aria-label="Pages">
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/writing/" aria-current="page">writing</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </header>
+
+  <main>
+    <p class="eyebrow reveal">Writing</p>
+    <h1 class="reveal">Notes from the systems layer.</h1>
+    <p class="lede reveal narrow">
+      Occasional posts about the software hospitality runs on — property management, revenue,
+      point of sale, distribution, and the long-suffering integrations in between.
+    </p>
+
+    <ul class="post-list reveal">
+      <li>
+        <a href="/writing/the-integration-tax">
+          <span class="meta">Draft</span>
+          <h3>The integration tax</h3>
+          <p class="excerpt">Every vendor says they integrate. The cost was never the connection — it's the reconciliation you inherit forever.</p>
+        </a>
+      </li>
+      <li>
+        <a href="/writing/front-desk-data">
+          <span class="meta">Draft</span>
+          <h3>Your BI is only as good as your front desk</h3>
+          <p class="excerpt">You cannot dashboard your way out of bad capture. Data quality is an operational problem wearing a technical costume.</p>
+        </a>
+      </li>
+      <li>
+        <a href="/writing/buying-a-pms">
+          <span class="meta">Draft</span>
+          <h3>What operators get wrong when buying a PMS</h3>
+          <p class="excerpt">The demo shows you the features. It never shows you the data model, and the data model is what you actually have to live with.</p>
+        </a>
+      </li>
+    </ul>
+  </main>
+
+  <footer class="foot">
+    <span>p<span class="at-small">@</span>rker.me</span>
+    <nav aria-label="Pages">
+      <a class="u" href="/">home</a>
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </footer>
+</div>
+
+<script>
+  const items = document.querySelectorAll(".reveal");
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches && "IntersectionObserver" in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          e.target.style.transitionDelay = (i * 60) + "ms";
+          e.target.classList.add("in");
+          io.unobserve(e.target);
+        }
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+    items.forEach(el => io.observe(el));
+  } else {
+    items.forEach(el => el.classList.add("in"));
+  }
+</script>
+</body>
+</html>
