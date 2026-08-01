@@ -13,6 +13,7 @@ no build step, no framework.
 | `og.png` | 1200×630 social share image. |
 | `robots.txt`, `sitemap.xml`, `llms.txt` | Crawler / SEO / LLM discovery. |
 | `_headers` | Security headers (Cloudflare Pages syntax). |
+| `fonts.css`, `fonts/` | Self-hosted Space Grotesk / Space Mono (woff2, SIL OFL). |
 
 ## Editing
 
