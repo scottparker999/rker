@@ -13,12 +13,14 @@
 - [Colophon](https://rker.me/colophon): how this site is built
 
 ## Writing
+- [The cost of a checkout](https://rker.me/writing/the-cost-of-a-checkout): why housekeeping cost tracks departures rather than occupancy, and why length of stay is a cost lever
 - [You cannot pay an OTA to leave you alone](https://rker.me/writing/paying-the-ota): why every OTA programme is optional in name and compulsory in practice, why clearing one hoop only produces another, and what the channel really costs
 - [The integration tax](https://rker.me/writing/the-integration-tax): why connecting systems is the cheap part and reconciliation is the ongoing cost
 - [Your BI is only as good as your front desk](https://rker.me/writing/front-desk-data): data quality as an operational problem, not a reporting one
 - [What operators get wrong when buying a PMS](https://rker.me/writing/buying-a-pms): data model and data access matter more than the feature matrix
 
 ## Tools
+- [Housekeeping labour model](https://rker.me/tools/housekeeping-labour): required hours, staffing and cost per occupied room from the arrival and departure pattern, with weekend loading, rostering slack and the value of a shift in length of stay
 - [OTA vs direct true cost calculator](https://rker.me/tools/ota-vs-direct): what an OTA booking really costs once commission, Genius and member discounts, Preferred Partner uplift, sponsored ads, virtual card fees and cancellations are counted, plus the breakeven direct rate
 - [Group displacement calculator](https://rker.me/tools/group-displacement): whether a group booking contributes more than the transient business it displaces — per-night displacement, contribution after commission and variable cost, and breakeven group rate
 
