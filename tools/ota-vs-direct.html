@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTA vs direct: true cost of a booking — rker.me</title>
+<meta name="description" content="What an OTA booking actually costs once commission, Genius and member discounts, Preferred Partner uplift, sponsored ads, virtual card fees and cancellations are counted — against direct and against other OTAs. Runs entirely in your browser.">
+<link rel="canonical" href="https://rker.me/tools/ota-vs-direct">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="OTA vs direct: true cost of a booking">
+<meta property="og:description" content="Commission is the small part. Count the discounts, the ads, the virtual card fee and the cancellations.">
+<meta property="og:url" content="https://rker.me/tools/ota-vs-direct">
+<meta property="og:image" content="https://rker.me/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="stylesheet" href="/fonts.css">
+<link rel="stylesheet" href="/site.css">
+<link rel="stylesheet" href="/tools/tools.css">
+<noscript><style>.reveal{opacity:1 !important;transform:none !important}</style></noscript>
+
+</head>
+<body>
+<div class="wrap tool-wrap">
+
+  <header class="topbar">
+    <a class="home" href="/">P<span class="at">@</span>rker</a>
+    <nav aria-label="Pages">
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/writing/">writing</a>
+      <a class="u" href="/tools/" aria-current="page">tools</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </header>
+
+  <main>
+    <p class="eyebrow reveal">Tool</p>
+    <h1 class="reveal">What a booking really costs.</h1>
+    <p class="lede reveal narrow">
+      Commission is the part everyone quotes and the smallest part of the answer. This counts the
+      discount off the rate, the ads, the card fee and the cancellations too — per channel, side
+      by side.
+    </p>
+
+    <noscript>
+      <p class="draft">This calculator needs JavaScript. It runs entirely in your browser — nothing is sent anywhere.</p>
+    </noscript>
+
+    <form id="calc" autocomplete="off">
+
+      <section class="section reveal">
+        <h2>Card rates</h2>
+        <div>
+          <p>
+            These belong to your merchant agreement, so they are the same whoever sends the
+            booking. What changes per channel is <strong>which kind of card turns up</strong> — and
+            that is set further down.
+          </p>
+          <div class="field-grid">
+            <label>
+              <span>Currency</span>
+              <select id="currency">
+                <option value="AUD" selected>AUD — Australian dollar</option>
+                <option value="NZD">NZD — New Zealand dollar</option>
+                <option value="USD">USD — US dollar</option>
+                <option value="GBP">GBP — Pound sterling</option>
+                <option value="EUR">EUR — Euro</option>
+                <option value="SGD">SGD — Singapore dollar</option>
+              </select>
+              <small>Display only — no conversion is applied.</small>
+            </label>
+            <label>
+              <span>OTA virtual card</span>
+              <input type="number" id="rate-vcc" value="3.5" min="0" max="100" step="0.01" inputmode="decimal">
+              <small>Foreign-issued commercial card, cross-border rate.</small>
+            </label>
+            <label>
+              <span>Guest card, international</span>
+              <input type="number" id="rate-intlCard" value="2.9" min="0" max="100" step="0.01" inputmode="decimal">
+            </label>
+            <label>
+              <span>Guest card, domestic</span>
+              <input type="number" id="rate-domesticCard" value="0.45" min="0" max="100" step="0.01" inputmode="decimal">
+              <small>Consumer card on your own acquiring rate.</small>
+            </label>
+            <label>
+              <span>Bank transfer / remittance</span>
+              <input type="number" id="rate-transfer" value="0" min="0" max="100" step="0.01" inputmode="decimal">
+            </label>
+            <label>
+              <span>Fixed fee per transaction</span>
+              <input type="number" id="paymentFeeFixed" value="0.30" min="0" step="0.01" inputmode="decimal">
+            </label>
+            <label>
+              <span>Rooms per booking</span>
+              <input type="number" id="roomsPerBooking" value="1" min="1" step="1" inputmode="numeric">
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal">
+        <h2>Channels</h2>
+        <div>
+          <p>
+            One column per channel. The figures below are illustrative defaults, not benchmarks —
+            replace them with your own. Tick <strong>direct</strong> on the channel you own; it is
+            measured against the best of the others.
+          </p>
+
+          <div class="table-scroll">
+            <table class="grid channels" id="channelTable">
+              <caption class="sr-only">Cost inputs by channel</caption>
+              <thead><tr id="channelHead"></tr></thead>
+              <tbody id="channelBody"></tbody>
+            </table>
+          </div>
+
+          <p class="row-actions no-print">
+            <button class="btn ghost" type="button" id="addChannel">+ Add channel</button>
+            <button class="btn ghost" type="button" id="resetAll">Reset</button>
+          </p>
+        </div>
+      </section>
+    </form>
+
+    <section class="section reveal">
+      <h2>Verdict</h2>
+      <div>
+        <div id="warnings" role="status" aria-live="polite"></div>
+
+        <div class="verdict" id="verdict">
+          <p class="verdict-call" id="verdictCall">—</p>
+          <p class="verdict-net" id="verdictNet"></p>
+          <p class="verdict-why" id="verdictWhy"></p>
+        </div>
+
+        <dl class="figures" id="figures"></dl>
+
+        <div class="table-scroll">
+          <table class="grid results" id="resultTable">
+            <caption>Where the money goes</caption>
+            <thead><tr id="resultHead"></tr></thead>
+            <tbody id="resultBody"></tbody>
+          </table>
+        </div>
+
+        <p class="row-actions no-print">
+          <button class="btn" type="button" id="print">↓ Save as PDF</button>
+        </p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <h2>Method</h2>
+      <div>
+        <p>
+          <strong>Payment is a settlement mix, not a single rate.</strong> OTA bookings are largely
+          settled by virtual card, and those cards are issued on foreign BINs as commercial cards —
+          so they reach your acquirer as cross-border commercial transactions at around 3–3.5%. A
+          domestic guest paying on their own consumer card can be under 0.5%. On a two-night $240
+          booking that gap alone is roughly fifteen dollars, and it never appears in a commission
+          comparison. Card rates here are global because they come from your merchant agreement;
+          only the mix changes by channel.
+        </p>
+        <p>
+          <strong>Commission is charged on the discounted rate, not the rate you loaded.</strong>
+          Genius, member rates, mobile rates and campaign deals come off first and stack
+          multiplicatively, then commission applies to what is left. The discount is a real cost
+          even though it never appears on an invoice, so it is shown as its own line.
+        </p>
+        <p>
+          <strong>Advertising is sunk; commission is not.</strong> This is the distinction most
+          comparisons miss. If a booking cancels you are refunded the commission, the card fee and
+          the platform fee — but the sponsored ad, Visibility Booster or metasearch click that won
+          it is already spent. A channel with a high cancellation rate therefore carries its
+          acquisition cost several times over for every booking that sticks.
+        </p>
+        <p>
+          <strong>A cancellation is not automatically a lost room.</strong> Cancelled nights may
+          resell, so the resale rate and the rate you recover at are modelled rather than assuming
+          the revenue evaporates. Resold rooms are assumed to resell through the same channel's
+          cost structure, which is a simplification.
+        </p>
+        <p>
+          <strong>The breakeven direct rate</strong> is the headline output: the rate at which your
+          direct channel exactly matches the best OTA once every cost above is counted. The gap
+          between it and your current direct rate is what you can afford to give away — as a
+          discount, a loyalty benefit, breakfast, parking, or ad spend to win the booking — and
+          still be ahead. It is a ceiling on the incentive, not a target.
+        </p>
+        <p>
+          <strong>Keep length of stay equal unless you mean to vary it.</strong> Every figure here
+          is per booking, so nights are part of the total. Direct bookings often do run longer, and
+          modelling that is legitimate — but if you give one channel more nights, the per-booking
+          gap and the breakeven headroom will reflect the extra night as well as the lower cost.
+          Net ADR is the line to read for a like-for-like rate comparison.
+        </p>
+        <p>
+          Servicing cost per occupied room is deliberately excluded. It is the same whoever sends
+          the guest, and this is a comparison of what it costs to <em>acquire</em> a booking, not
+          what it costs to deliver one. For the delivery side, see the
+          <a class="u" href="/tools/group-displacement">group displacement calculator</a>.
+        </p>
+        <p>
+          What this does not model: repeat and lifetime value, data ownership, rate parity
+          pressure, the billboard effect, the operational cost of virtual cards that fail to
+          authorise or fall outside their activation window, and contracted override or override
+          bonus structures. Several of those favour direct and would widen the gap. They are
+          judgement, and a calculator that invents numbers for them is worse than one that leaves
+          the room for them.
+        </p>
+        <p class="fineprint">
+          Everything here runs in your browser. No figures are sent anywhere, nothing is stored, and
+          there is no analytics on this page.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span><a class="u" href="/tools/">← all tools</a></span>
+    <nav aria-label="Pages">
+      <a class="u" href="/">home</a>
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/writing/">writing</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </footer>
+</div>
+
+<script type="module">
+  import { compare, verdict, SETTLEMENT_TYPES } from '/tools/channel-cost.js';
+
+  const $ = (id) => document.getElementById(id);
+
+  const CARD_RATE_IDS = SETTLEMENT_TYPES.map((t) => t.key);
+
+  /* Input rows, in the order they read as a cost stack. */
+  const ROWS = [
+    { group: 'Rate' },
+    { key: 'grossAdr', label: 'Rate loaded', step: 0.01 },
+    { key: 'nights', label: 'Nights', step: 1 },
+    { key: 'programmeDiscountPct', label: 'Programme discount %', hint: 'Genius, member, mobile', step: 0.1 },
+    { key: 'promoDiscountPct', label: 'Promo / campaign %', step: 0.1 },
+
+    { group: 'Commission' },
+    { key: 'baseCommissionPct', label: 'Base commission %', step: 0.1 },
+    { key: 'preferredUpliftPp', label: 'Preferred / accelerator +pp', step: 0.1 },
+
+    { group: 'Acquisition' },
+    { key: 'adCostPerBooking', label: 'Ads per booking', hint: 'Sponsored, metasearch', step: 0.01 },
+    { key: 'adCostPct', label: 'Ads %', step: 0.1 },
+
+    { group: 'Settlement mix %' },
+    ...SETTLEMENT_TYPES.map((t) => ({ key: `mix.${t.key}`, label: t.label, step: 1 })),
+
+    { group: 'Other cost' },
+    { key: 'platformFeePct', label: 'Booking engine / platform %', step: 0.1 },
+    { key: 'platformFeeFixed', label: 'Platform fixed', step: 0.01 },
+    { key: 'otherCostPerBooking', label: 'Other per booking', step: 0.01 },
+
+    { group: 'Cancellation' },
+    { key: 'cancellationRatePct', label: 'Cancellation rate %', step: 0.1 },
+    { key: 'resellRatePct', label: 'Of those, resold %', step: 0.1 },
+    { key: 'recoveryAdrPct', label: 'Resold at % of rate', step: 0.1 },
+  ];
+
+  const SEED = [
+    {
+      name: 'Booking.com', isDirect: false,
+      grossAdr: 240, nights: 2,
+      programmeDiscountPct: 10, promoDiscountPct: 0,
+      baseCommissionPct: 15, preferredUpliftPp: 3,
+      adCostPerBooking: 6, adCostPct: 0,
+      mix: { vcc: 70, intlCard: 20, domesticCard: 10, transfer: 0 },
+      platformFeePct: 0, platformFeeFixed: 0, otherCostPerBooking: 0,
+      cancellationRatePct: 32, resellRatePct: 55, recoveryAdrPct: 90,
+    },
+    {
+      name: 'Expedia', isDirect: false,
+      grossAdr: 240, nights: 2,
+      programmeDiscountPct: 0, promoDiscountPct: 5,
+      baseCommissionPct: 18, preferredUpliftPp: 0,
+      adCostPerBooking: 4, adCostPct: 0,
+      mix: { vcc: 80, intlCard: 15, domesticCard: 5, transfer: 0 },
+      platformFeePct: 0, platformFeeFixed: 0, otherCostPerBooking: 0,
+      cancellationRatePct: 24, resellRatePct: 55, recoveryAdrPct: 90,
+    },
+    {
+      name: 'Direct', isDirect: true,
+      grossAdr: 240, nights: 2,
+      programmeDiscountPct: 0, promoDiscountPct: 0,
+      baseCommissionPct: 0, preferredUpliftPp: 0,
+      adCostPerBooking: 9, adCostPct: 0,
+      mix: { vcc: 0, intlCard: 25, domesticCard: 75, transfer: 0 },
+      platformFeePct: 2.5, platformFeeFixed: 0, otherCostPerBooking: 0,
+      cancellationRatePct: 14, resellRatePct: 60, recoveryAdrPct: 95,
+    },
+  ];
+
+  const rooms = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
+  const pctFmt = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 });
+  let money, money2, moneyCurrency;
+  function formatters() {
+    const currency = $('currency').value;
+    if (currency !== moneyCurrency) {
+      moneyCurrency = currency;
+      money = new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 });
+      money2 = new Intl.NumberFormat(undefined, { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+  }
+
+  /* ---------- building the input table ---------- */
+
+  let channels = [];
+
+  function buildTable() {
+    const head = $('channelHead');
+    head.replaceChildren();
+    const corner = document.createElement('th');
+    corner.scope = 'row';
+    corner.textContent = '';
+    head.appendChild(corner);
+
+    channels.forEach((ch, i) => {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      // Print hides the radio, so the header itself has to carry which is direct.
+      if (ch.isDirect) th.classList.add('is-direct');
+
+      const name = document.createElement('input');
+      name.type = 'text';
+      name.value = ch.name;
+      name.className = 'channel-name';
+      name.setAttribute('aria-label', `Channel ${i + 1} name`);
+      name.addEventListener('input', () => { channels[i].name = name.value; render(); });
+
+      const label = document.createElement('label');
+      label.className = 'direct-toggle';
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'directChannel';
+      radio.checked = !!ch.isDirect;
+      radio.addEventListener('change', () => {
+        channels.forEach((c, j) => { c.isDirect = j === i; });
+        render();
+      });
+      const span = document.createElement('span');
+      span.textContent = 'direct';
+      label.append(radio, span);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'remove no-print';
+      remove.textContent = '×';
+      remove.title = 'Remove channel';
+      remove.setAttribute('aria-label', `Remove ${ch.name}`);
+      remove.addEventListener('click', () => {
+        channels.splice(i, 1);
+        buildTable();
+        render();
+      });
+
+      const wrap = document.createElement('div');
+      wrap.className = 'channel-head';
+      wrap.append(name, label, remove);
+      th.appendChild(wrap);
+      head.appendChild(th);
+    });
+
+    const body = $('channelBody');
+    body.replaceChildren();
+
+    for (const row of ROWS) {
+      const tr = document.createElement('tr');
+      if (row.group) {
+        tr.className = 'group-row';
+        const th = document.createElement('th');
+        th.scope = 'row';
+        th.colSpan = channels.length + 1;
+        th.textContent = row.group;
+        tr.appendChild(th);
+        body.appendChild(tr);
+        continue;
+      }
+
+      const th = document.createElement('th');
+      th.scope = 'row';
+      th.textContent = row.label;
+      if (row.hint) {
+        const small = document.createElement('small');
+        small.textContent = row.hint;
+        th.appendChild(small);
+      }
+      tr.appendChild(th);
+
+      channels.forEach((ch, i) => {
+        const td = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = row.step;
+        input.min = 0;
+        input.inputMode = 'decimal';
+        input.value = readField(ch, row.key);
+        input.setAttribute('aria-label', `${row.label}, ${ch.name}`);
+        input.addEventListener('input', () => {
+          writeField(channels[i], row.key, input.value);
+          render();
+        });
+        td.appendChild(input);
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    }
+  }
+
+  const readField = (ch, key) =>
+    key.startsWith('mix.') ? ch.mix[key.slice(4)] : ch[key];
+  const writeField = (ch, key, value) => {
+    if (key.startsWith('mix.')) ch.mix[key.slice(4)] = value;
+    else ch[key] = value;
+  };
+
+  /* ---------- results ---------- */
+
+  function readInput() {
+    const cardRates = {};
+    CARD_RATE_IDS.forEach((k) => { cardRates[k] = $(`rate-${k}`).value; });
+    return {
+      roomsPerBooking: $('roomsPerBooking').value,
+      paymentFeeFixed: $('paymentFeeFixed').value,
+      cardRates,
+      channels: channels.map((c) => ({ ...c, settlementMix: c.mix })),
+    };
+  }
+
+  function figure(dl, term, value, note) {
+    const d = document.createElement('div');
+    const dt = document.createElement('dt');
+    dt.textContent = term;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    d.append(dt, dd);
+    if (note) {
+      const small = document.createElement('small');
+      small.textContent = note;
+      d.appendChild(small);
+    }
+    dl.appendChild(d);
+  }
+
+  const RESULT_ROWS = [
+    { label: 'Rate loaded', get: (c) => money2.format(c.grossAdr * c.roomNights) },
+    { label: 'Discount given', get: (c) => c.discountGiven ? '−' + money2.format(c.discountGiven) : '—', dim: true },
+    { label: 'Revenue after discount', get: (c) => money2.format(c.grossRevenue), strong: true },
+    { label: 'Commission', get: (c) => c.commission ? '−' + money2.format(c.commission) : '—' },
+    { label: 'Card fee', get: (c) => c.payment ? '−' + money2.format(c.payment) : '—' },
+    { label: 'Platform', get: (c) => c.platform ? '−' + money2.format(c.platform) : '—' },
+    { label: 'Advertising', get: (c) => c.advertising ? '−' + money2.format(c.advertising) : '—' },
+    { label: 'Other', get: (c) => c.other ? '−' + money2.format(c.other) : '—' },
+    { label: 'Net if it sticks', get: (c) => money2.format(c.netIfRealised), strong: true },
+    { label: 'Expected net', get: (c) => money2.format(c.expectedNet), strong: true, hint: 'after cancellations and resale' },
+    { label: 'Net ADR', get: (c) => money2.format(c.expectedNetAdr) },
+    { label: 'Card fee rate', get: (c) => pctFmt.format(c.paymentPct) },
+    { label: 'True cost of sale', get: (c) => pctFmt.format(c.costOfRackPct), strong: true, hint: 'against the rate you loaded' },
+  ];
+
+  function render() {
+    formatters();
+    const result = compare(readInput());
+    const cmp = result.comparison;
+
+    // --- results table -------------------------------------------------
+    const head = $('resultHead');
+    head.replaceChildren();
+    const corner = document.createElement('th');
+    corner.scope = 'row';
+    head.appendChild(corner);
+    for (const c of result.channels) {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.textContent = c.name;
+      if (cmp && cmp.best && c === cmp.best) th.classList.add('best');
+      head.appendChild(th);
+    }
+
+    const body = $('resultBody');
+    body.replaceChildren();
+    for (const row of RESULT_ROWS) {
+      const tr = document.createElement('tr');
+      if (row.strong) tr.className = 'strong';
+      const th = document.createElement('th');
+      th.scope = 'row';
+      th.textContent = row.label;
+      if (row.hint) {
+        const small = document.createElement('small');
+        small.textContent = row.hint;
+        th.appendChild(small);
+      }
+      tr.appendChild(th);
+      for (const c of result.channels) {
+        const td = document.createElement('td');
+        td.textContent = row.get(c);
+        if (row.dim) td.classList.add('dim');
+        tr.appendChild(td);
+      }
+      body.appendChild(tr);
+    }
+
+    // --- verdict -------------------------------------------------------
+    const call = verdict(cmp);
+    const v = $('verdict');
+    v.dataset.call = call === 'direct' ? 'accept' : call === 'ota' ? 'decline' : 'marginal';
+
+    if (!cmp || call === 'incomplete') {
+      $('verdictCall').textContent = 'Mark a direct channel';
+      $('verdictNet').textContent = '';
+      $('verdictWhy').textContent = 'Tick “direct” on the channel you own to compare it against the rest.';
+    } else {
+      const adv = cmp.directAdvantage;
+      const HEAD = {
+        direct: 'Direct wins',
+        ota: `${cmp.bestOther.name} wins`,
+        level: 'Line ball',
+      };
+      $('verdictCall').textContent = HEAD[call];
+      $('verdictNet').textContent =
+        `${adv >= 0 ? '+' : '−'}${money2.format(Math.abs(adv))} per booking vs ${cmp.bestOther.name}`;
+      const bk = cmp.breakeven;
+      $('verdictWhy').textContent = bk && bk.headroom > 0
+        ? `You could drop the direct rate to ${money2.format(bk.grossAdr)} — give away ${money2.format(bk.headroom)}, or ${pctFmt.format(bk.headroomPct)} — and still match ${bk.against}.`
+        : bk
+          ? `Direct would need to reach ${money2.format(bk.grossAdr)} to match ${bk.against}.`
+          : '';
+    }
+
+    // --- figures -------------------------------------------------------
+    const dl = $('figures');
+    dl.replaceChildren();
+    if (cmp) {
+      if (cmp.direct) {
+        figure(dl, 'Direct expected net', money2.format(cmp.direct.expectedNet),
+          `True cost of sale ${pctFmt.format(cmp.direct.costOfRackPct)}`);
+      }
+      if (cmp.bestOther) {
+        figure(dl, `Best other — ${cmp.bestOther.name}`, money2.format(cmp.bestOther.expectedNet),
+          `True cost of sale ${pctFmt.format(cmp.bestOther.costOfRackPct)}`);
+      }
+      if (cmp.breakeven) {
+        figure(dl, 'Breakeven direct rate', money2.format(cmp.breakeven.grossAdr),
+          `Matches ${cmp.breakeven.against} once every cost is counted`);
+        figure(dl, 'Incentive headroom', money2.format(Math.max(0, cmp.breakeven.headroom)),
+          cmp.breakeven.headroom > 0
+            ? `${pctFmt.format(cmp.breakeven.headroomPct)} of the direct rate`
+            : 'Direct is behind — no headroom');
+      }
+      figure(dl, 'Spread across channels', money2.format(cmp.spread),
+        `${cmp.best.name} best, ${cmp.worst.name} worst`);
+    }
+
+    // --- warnings ------------------------------------------------------
+    const warn = $('warnings');
+    warn.replaceChildren();
+    for (const w of result.warnings) {
+      const p = document.createElement('p');
+      p.className = 'warn';
+      p.textContent = w;
+      warn.appendChild(p);
+    }
+  }
+
+  /* ---------- wiring ---------- */
+
+  function seed() {
+    channels = SEED.map((c) => ({ ...c, mix: { ...c.mix } }));
+    buildTable();
+  }
+
+  $('addChannel').addEventListener('click', () => {
+    const last = channels[channels.length - 1];
+    const copy = last
+      ? { ...last, mix: { ...last.mix }, name: 'New channel', isDirect: false }
+      : { ...SEED[0], mix: { ...SEED[0].mix }, name: 'New channel', isDirect: false };
+    channels.push(copy);
+    buildTable();
+    render();
+  });
+
+  $('resetAll').addEventListener('click', () => { seed(); render(); });
+  $('print').addEventListener('click', () => window.print());
+  $('calc').addEventListener('input', (e) => { if (e.target.closest('.field-grid')) render(); });
+  $('calc').addEventListener('change', (e) => { if (e.target.closest('.field-grid')) render(); });
+
+  seed();
+  render();
+
+  const items = document.querySelectorAll('.reveal');
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          e.target.style.transitionDelay = (i * 60) + 'ms';
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+    items.forEach((el) => io.observe(el));
+  } else {
+    items.forEach((el) => el.classList.add('in'));
+  }
+</script>
+</body>
+</html>
