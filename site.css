@@ -141,6 +141,18 @@ p:last-child { margin-bottom: 0; }
 }
 .tag:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
 
+/* Named platforms, grouped under a small label */
+.tag-group + .tag-group { margin-top: 1.2rem; }
+.tag-group .label {
+  font-family: "Space Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 0.5rem;
+}
+.tag-group .tags { margin-top: 0; }
+
 /* ---------- buttons ---------- */
 .btn {
   display: inline-flex;
@@ -252,6 +264,7 @@ p:last-child { margin-bottom: 0; }
   .lede { font-size: 11.5pt; margin-bottom: 1.2rem; }
   .section { break-inside: avoid; padding: 0.75rem 0; grid-template-columns: 9rem 1fr; }
   .tag { border-color: #bbb; }
+  .tag-group { break-inside: avoid; }
   a { color: #000; text-decoration: none; }
   .print-contact { display: block !important; }
 }
