@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- ============================================================
+     rker.me — personal home page.
+     Things you'll want to edit are marked  EDIT ME  below.
+     Deploy: upload this folder to Cloudflare Pages (index.html
+     is the entry point). Every asset here is optional except
+     index.html — the page renders fine on its own.
+     ============================================================ -->
+
+<!-- ---------- Core SEO ---------- -->
+<title>Parker — home on the internet</title>
+<meta name="description" content="Gold Coast–based hospitality &amp; tourism systems specialist — PMS, RMS, BI, POS, web and integrations, with 20 years' experience. Say hello at p@rker.me.">
+<meta name="author" content="Scott Parker">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://rker.me/">
+
+<!-- ---------- Appearance ---------- -->
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
+
+<!-- ---------- Icons ---------- -->
+<!-- Inline SVG icon keeps the page self-sufficient; the .svg file is a fallback. -->
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNyIgZmlsbD0iIzRCM0JGRiIvPjx0ZXh0IHg9IjE2IiB5PSIyMyIgZm9udC1mYW1pbHk9InN5c3RlbS11aSwtYXBwbGUtc3lzdGVtLFNlZ29lIFVJLFJvYm90byxzYW5zLXNlcmlmIiBmb250LXNpemU9IjIyIiBmb250LXdlaWdodD0iNzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjRkJGQUY3Ij5APC90ZXh0Pjwvc3ZnPg==" type="image/svg+xml">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+
+<!-- ---------- Open Graph (Facebook, LinkedIn, iMessage, Slack…) ---------- -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="rker.me">
+<meta property="og:title" content="Parker — home on the internet">
+<meta property="og:description" content="Gold Coast–based hospitality systems specialist — PMS, RMS, BI, POS, web and integrations. 20 years in tourism.">
+<meta property="og:url" content="https://rker.me/">
+<meta property="og:image" content="https://rker.me/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The wordmark P@rker, where the @ forms the A.">
+<meta property="og:locale" content="en_AU">
+
+<!-- ---------- Twitter / X ---------- -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Parker — home on the internet">
+<meta name="twitter:description" content="Gold Coast–based hospitality systems specialist — PMS, RMS, BI, POS, web and integrations. 20 years in tourism.">
+<meta name="twitter:image" content="https://rker.me/og.png">
+<meta name="twitter:image:alt" content="The wordmark P@rker, where the @ forms the A.">
+
+<!-- ---------- Structured data: this is what search + AI crawlers parse ---------- -->
+<!-- EDIT ME: name is set to your real name for search — change to "Parker" if you'd rather stay first-name-less. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "Scott Parker",
+  "url": "https://rker.me/",
+  "email": "mailto:p@rker.me",
+  "jobTitle": "Hospitality Systems Specialist",
+  "description": "Gold Coast–based systems specialist with 20 years in hospitality and tourism. Full-stack hospitality systems — PMS, RMS, BI, POS, websites and the integrations between them — with a side interest in networking, surveillance, telephony, AI and automation.",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Gold Coast",
+    "addressRegion": "QLD",
+    "addressCountry": "AU"
+  },
+  "knowsAbout": [
+    "Property Management Systems (PMS)",
+    "Revenue Management Systems (RMS)",
+    "Business Intelligence",
+    "Point of Sale (POS)",
+    "Hospitality distribution",
+    "Systems integration",
+    "Web development",
+    "Networking",
+    "On-premises and cloud surveillance",
+    "VoIP telephony",
+    "AI and automation"
+  ],
+  "sameAs": [
+    "https://www.linkedin.com/in/scott-p-7385b52a/"
+  ]
+}
+</script>
+
+<!-- ---------- Fonts ---------- -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    color-scheme: light dark;
+    --paper:  #FBFAF7;
+    --ink:    #1A1A1A;
+    --muted:  #6B6B6B;
+    --line:   #E7E4DD;
+    --accent: #4B3BFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:  #131210;
+      --ink:    #ECEAE3;
+      --muted:  #8A8781;
+      --line:   #2A2824;
+      --accent: #8674FF;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Space Grotesk", system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .flags {
+    display: flex;
+    justify-content: center;
+    gap: 0.6rem;
+    margin-bottom: 1.9rem;
+    opacity: 0;
+    animation: rise 0.7s ease-out 0.05s forwards;
+  }
+  .flags img {
+    width: 32px;
+    height: 24px;
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
+    display: block;
+  }
+  @media (prefers-color-scheme: dark) {
+    .flags img { box-shadow: 0 0 0 1px rgba(255,255,255,0.14); }
+  }
+
+  h1.name {
+    display: flex;
+    justify-content: center;
+    font-weight: 700;
+    line-height: 0.9;
+  }
+
+  .wordmark {
+    font-family: inherit;
+    font-weight: 700;
+    font-size: clamp(3.75rem, 18vw, 11rem);
+    line-height: 0.9;
+    letter-spacing: -0.03em;
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    padding: 0.1em 0.15em;
+    border-radius: 0.15em;
+    opacity: 0;
+    animation: rise 0.8s ease-out 0.25s forwards;
+  }
+  .wordmark:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 0.1em;
+  }
+
+  .at {
+    color: var(--accent);
+    display: inline-block;
+    transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform-origin: 55% 55%;
+    animation: settle 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 0.55s backwards;
+  }
+  .wordmark:hover .at,
+  .wordmark:focus-visible .at { transform: rotate(360deg); }
+
+  .hint {
+    font-family: "Space Mono", monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.6rem;
+    height: 1.2em;
+    opacity: 0;
+    animation: rise 0.7s ease-out 0.45s forwards;
+    transition: color 0.2s ease;
+  }
+  .hint.copied { color: var(--accent); }
+
+  .tagline {
+    max-width: 42ch;
+    margin-inline: auto;
+    font-size: clamp(1rem, 3.5vw, 1.2rem);
+    color: var(--muted);
+    margin-top: 1.75rem;
+    line-height: 1.5;
+    opacity: 0;
+    animation: rise 0.8s ease-out 0.55s forwards;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem 1.4rem;
+    margin-top: 2.25rem;
+    font-family: "Space Mono", monospace;
+    font-size: 0.85rem;
+    opacity: 0;
+    animation: rise 0.8s ease-out 0.7s forwards;
+  }
+  .links a {
+    color: var(--ink);
+    text-decoration: none;
+    position: relative;
+    padding-bottom: 2px;
+  }
+  .links a::after {
+    content: "";
+    position: absolute;
+    left: 0; bottom: 0;
+    width: 100%; height: 1.5px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.25s ease;
+  }
+  .links a:hover::after,
+  .links a:focus-visible::after { transform: scaleX(1); }
+  .links a:focus-visible { outline: none; color: var(--accent); }
+
+  footer {
+    position: fixed;
+    bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.7rem;
+    font-family: "Space Mono", monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    opacity: 0;
+    animation: rise 0.8s ease-out 0.9s forwards;
+  }
+  footer .at-small { color: var(--accent); }
+
+  .pages {
+    display: flex;
+    gap: 1.3rem;
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+  }
+  .pages a {
+    color: var(--ink);
+    text-decoration: none;
+    position: relative;
+    padding-bottom: 2px;
+  }
+  .pages a::after {
+    content: "";
+    position: absolute;
+    left: 0; bottom: 0;
+    width: 100%; height: 1.5px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.25s ease;
+  }
+  .pages a:hover::after,
+  .pages a:focus-visible::after { transform: scaleX(1); }
+  .pages a:focus-visible { outline: none; color: var(--accent); }
+
+  /* Keep the fixed footer from colliding with content on short screens */
+  body { padding-bottom: 6rem; }
+  @media (max-height: 600px) {
+    footer { position: static; margin-top: 2.5rem; }
+    body { padding-bottom: 2rem; }
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes settle {
+    0%   { transform: rotate(-190deg) scale(0.4); }
+    100% { transform: rotate(0deg) scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, .at { animation: none !important; transition: none !important; }
+    .flags, .wordmark, .hint, .tagline, .links, footer { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+  <main>
+    <!-- Dual citizenship as the eyebrow. Order/size tweakable. -->
+    <div class="flags">
+      <img src="/gb.svg" width="32" height="24" alt="United Kingdom" loading="lazy" decoding="async">
+      <img src="/au.svg" width="32" height="24" alt="Australia" loading="lazy" decoding="async">
+    </div>
+
+    <!-- The name is the page's h1; the button inside copies your email on click. -->
+    <h1 class="name">
+      <button class="wordmark" id="mark" aria-label="Copy email address p@rker.me">P<span class="at">@</span>rker</button>
+    </h1>
+
+    <!-- Live region: screen readers announce the "copied" confirmation. -->
+    <p class="hint" id="hint" role="status" aria-live="polite">click my name to copy the email</p>
+
+    <!-- EDIT ME: your one-liner -->
+    <p class="tagline">Gold Coast–based, with twenty years in hospitality and tourism. Full-stack systems specialist — PMS, RMS, BI, POS, web and the integrations that tie them together.</p>
+
+    <!-- EDIT ME: your links. Delete any you don't want. -->
+    <nav class="links" aria-label="Elsewhere">
+      <a href="mailto:p@rker.me">email</a>
+      <a href="https://www.linkedin.com/in/scott-p-7385b52a/" target="_blank" rel="noopener me">linkedin</a>
+    </nav>
+  </main>
+
+  <footer>
+    <nav class="pages" aria-label="Pages">
+      <a href="/cv">cv</a>
+      <a href="/writing/">writing</a>
+      <a href="/colophon">colophon</a>
+    </nav>
+    <span class="mark-line">p<span class="at-small">@</span>rker.me</span>
+  </footer>
+
+<script>
+  const EMAIL = "p@rker.me";   // EDIT ME if your address differs
+  const mark = document.getElementById("mark");
+  const hint = document.getElementById("hint");
+  const DEFAULT_HINT = "click my name to copy the email";
+  let resetTimer;
+
+  mark.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(EMAIL);
+      hint.textContent = "copied  ✓  " + EMAIL;
+    } catch {
+      hint.textContent = EMAIL;   // clipboard blocked — show it so it can be copied manually
+    }
+    hint.classList.add("copied");
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => {
+      hint.textContent = DEFAULT_HINT;
+      hint.classList.remove("copied");
+    }, 2600);
+  });
+</script>
+</body>
+</html>

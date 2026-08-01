@@ -6,6 +6,16 @@
 > cloud surveillance, telephony, AI and automation.
 > Personal home page at rker.me.
 
+## Pages
+- [CV](https://rker.me/cv): narrative career summary and capabilities
+- [Writing](https://rker.me/writing/): notes on hospitality systems
+- [Colophon](https://rker.me/colophon): how this site is built
+
+## Writing
+- [The integration tax](https://rker.me/writing/the-integration-tax): why connecting systems is the cheap part and reconciliation is the ongoing cost
+- [Your BI is only as good as your front desk](https://rker.me/writing/front-desk-data): data quality as an operational problem, not a reporting one
+- [What operators get wrong when buying a PMS](https://rker.me/writing/buying-a-pms): data model and data access matter more than the feature matrix
+
 ## Contact
 - Email: p@rker.me
 - LinkedIn: https://www.linkedin.com/in/scott-p-7385b52a/

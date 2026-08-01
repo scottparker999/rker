@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What operators get wrong when buying a PMS — Scott Parker</title>
+<meta name="description" content="The demo shows you the features. It never shows you the data model, and the data model is what you have to live with.">
+<link rel="canonical" href="https://rker.me/writing/buying-a-pms">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="What operators get wrong when buying a PMS">
+<meta property="og:description" content="The demo shows you the features. It never shows you the data model.">
+<meta property="og:url" content="https://rker.me/writing/buying-a-pms">
+<meta property="og:image" content="https://rker.me/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <a class="home" href="/">P<span class="at">@</span>rker</a>
+    <nav aria-label="Pages">
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/writing/">writing</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </header>
+
+  <main class="article">
+    <p class="draft">Draft — written to be rewritten.</p>
+
+    <p class="post-meta">Draft · Systems</p>
+    <h1>What operators get wrong when buying a PMS</h1>
+
+    <p class="lede">
+      A property management system is a ten-year decision made on the strength of a ninety-minute
+      demo, usually by a committee measuring the wrong things.
+    </p>
+
+    <p>
+      Selection processes tend to converge on a feature matrix. Every vendor gets a column, every
+      requirement gets a row, and whoever accumulates the most ticks wins. It feels rigorous. It
+      mostly measures which vendor is best at filling in spreadsheets.
+    </p>
+
+    <p>
+      The trouble is that features are the most visible and least durable part of a platform.
+      Anything missing today might ship next year. The things that won't change are the ones nobody
+      scored.
+    </p>
+
+    <h2>What you're actually buying</h2>
+
+    <p>
+      <strong>The data model.</strong> How the system thinks about a booking, a guest, a rate, a
+      night, a modification. You will be living inside those assumptions for a decade, and no
+      configuration screen will let you out. If it can't represent the way you actually sell — long
+      stays, sites versus rooms, groups, annuals, whatever your business really does — the gap
+      never closes. It just becomes a workaround someone maintains forever.
+    </p>
+
+    <p>
+      <strong>Data access.</strong> Can you get your own data out, in bulk, on your own schedule,
+      without asking? A vendor whose answer is "we can build you a report" has told you something
+      important about the next ten years. This one question predicts more future pain than any
+      feature on the matrix.
+    </p>
+
+    <p>
+      <strong>The integration posture.</strong> Not whether an API exists, but whether it's
+      documented, versioned, and treated as a product. Ask when it last had a breaking change and
+      how much notice customers got.
+    </p>
+
+    <p>
+      <strong>The release cadence.</strong> Frequent updates mean progress and disruption. Rare
+      updates mean stability and stagnation. Neither is wrong — but find out which one you're
+      signing up for, because it determines how much of your year gets spent on regression testing.
+    </p>
+
+    <blockquote>
+      Features are what you see in the demo. The data model is what you argue with at two in the
+      morning three years later.
+    </blockquote>
+
+    <h2>The exit is part of the purchase</h2>
+
+    <p>
+      Almost nobody negotiates the exit while they still have leverage, which is exactly when they
+      have it. Before signing, get answers in writing: what format is my data returned in, how long
+      does it take, what does it cost, and does it include history rather than just current-state
+      records.
+    </p>
+
+    <p>
+      A migration where you can only extract live bookings and not five years of history isn't a
+      migration. It's starting again with a spreadsheet of the past.
+    </p>
+
+    <h2>A better shortlist process</h2>
+
+    <ul>
+      <li><strong>Bring your own scenarios.</strong> Don't watch their demo — hand them five things you genuinely do, including the awkward ones, and make them show you.</li>
+      <li><strong>Sit with the people who'll use it.</strong> Twenty minutes of a front desk trying a real check-in beats any amount of executive walkthrough.</li>
+      <li><strong>Talk to a reference the vendor didn't choose.</strong> Find an operator your size who left, and ask why.</li>
+      <li><strong>Count the clicks.</strong> The most common task, done a hundred times a day, is your real cost of ownership.</li>
+      <li><strong>Price the whole stack.</strong> Licence, implementation, integrations, training, the interfaces you'll need in year two, and the internal time nobody puts in the business case.</li>
+    </ul>
+
+    <h2>And the honest part</h2>
+
+    <p>
+      There is no perfect system. Every option involves accepting a set of compromises, and the
+      right question isn't which platform is best — it's which set of compromises you can live with
+      for a decade, given how your business actually operates.
+    </p>
+
+    <p>
+      Teams that pick well tend to be the ones who worked out what they truly couldn't compromise
+      on before anyone booked a demo. Teams that pick badly tend to be the ones who let a very good
+      salesperson define the criteria for them.
+    </p>
+  </main>
+
+  <footer class="foot">
+    <span><a class="u" href="/writing/">← all writing</a></span>
+    <nav aria-label="Pages">
+      <a class="u" href="/">home</a>
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </footer>
+</div>
+</body>
+</html>

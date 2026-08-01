@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colophon — rker.me</title>
+<meta name="description" content="How this site is built: hand-written HTML, no framework, no build step, no analytics. Deployed from GitHub to Cloudflare.">
+<link rel="canonical" href="https://rker.me/colophon">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="Colophon — rker.me">
+<meta property="og:description" content="How this site is built.">
+<meta property="og:url" content="https://rker.me/colophon">
+<meta property="og:image" content="https://rker.me/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+<noscript><style>.reveal{opacity:1 !important;transform:none !important}</style></noscript>
+
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <a class="home" href="/">P<span class="at">@</span>rker</a>
+    <nav aria-label="Pages">
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/writing/">writing</a>
+      <a class="u" href="/colophon" aria-current="page">colophon</a>
+    </nav>
+  </header>
+
+  <main>
+    <p class="eyebrow reveal">Colophon</p>
+    <h1 class="reveal">How this thing is built.</h1>
+    <p class="lede reveal narrow">
+      Short version: hand-written HTML, no framework, no build step, no analytics,
+      no cookies. It is about as small as a website can reasonably be.
+    </p>
+
+    <section class="section reveal">
+      <h2>The name</h2>
+      <div>
+        <p>
+          The domain is <code>rker.me</code>, which is the back half of my surname. The point of it
+          is the email address: <strong>p@rker.me</strong>, where the <span style="color:var(--accent)">@</span>
+          does double duty as the <em>a</em>. The home page is built around that one idea — the
+          wordmark is the address, and clicking it copies it.
+        </p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <h2>Type</h2>
+      <div>
+        <p>
+          <strong>Space Grotesk</strong> for the name and body, <strong>Space Mono</strong> for
+          labels, navigation and anything that wants to look like metadata. A matched pair, which
+          keeps the personality consistent without needing a third face.
+        </p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <h2>Colour</h2>
+      <div>
+        <p>
+          A warm off-white rather than pure white, a warm near-black rather than pure black, and a
+          single electric indigo used sparingly — mostly on the <span style="color:var(--accent)">@</span>.
+          One accent, used rarely, does more work than a palette.
+        </p>
+        <p>
+          Dark mode follows your system setting automatically via <code>prefers-color-scheme</code>.
+          There is no toggle, because your operating system already has one.
+        </p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <h2>Build</h2>
+      <div>
+        <p>
+          There isn't one. Every page is plain HTML written by hand. No bundler, no framework, no
+          node_modules, nothing to go stale in six months. The whole site is a folder of files.
+        </p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <h2>Hosting</h2>
+      <div>
+        <p>
+          The source lives in a <strong>GitHub</strong> repository. <strong>Cloudflare</strong>
+          serves it as static assets and redeploys on every push, so editing a file in the browser
+          is enough to update the live site. Security headers are applied at the edge via a
+          <code>_headers</code> file.
+        </p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <h2>Machine readable</h2>
+      <div>
+        <p>
+          Probably more metadata than a page this size warrants, which was rather the point:
+          <code>schema.org</code> Person data as JSON-LD, Open Graph and Twitter cards with a
+          generated share image, <code>robots.txt</code>, <code>sitemap.xml</code>, a web app
+          manifest, and an <code>llms.txt</code> for language models that look for one.
+        </p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <h2>Accessibility</h2>
+      <div>
+        <p>
+          Semantic markup, a real heading structure, visible keyboard focus, contrast that holds up
+          in both themes, and a live region so the copy-to-clipboard confirmation is announced rather
+          than just seen. Every animation is switched off entirely when
+          <code>prefers-reduced-motion</code> is set.
+        </p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <h2>Privacy</h2>
+      <div>
+        <p>
+          No analytics, no tracking pixels, no cookies, no third-party scripts. I don't know you're
+          here and I'd rather keep it that way.
+        </p>
+        <p>
+          One honest caveat: the typefaces are served by Google Fonts, so that request does leave
+          your browser. Self-hosting them is on the list.
+        </p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <h2>Credits</h2>
+      <div>
+        <p>
+          Flags from the <a class="u" href="https://github.com/lipis/flag-icons" target="_blank" rel="noopener">flag-icons</a>
+          project. Typefaces by Florian Karsten and Colophon Foundry, via Google Fonts.
+          Everything else assembled here.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>p<span class="at-small">@</span>rker.me</span>
+    <nav aria-label="Pages">
+      <a class="u" href="/">home</a>
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/writing/">writing</a>
+    </nav>
+  </footer>
+</div>
+
+<script>
+  const items = document.querySelectorAll(".reveal");
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches && "IntersectionObserver" in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          e.target.style.transitionDelay = (i * 60) + "ms";
+          e.target.classList.add("in");
+          io.unobserve(e.target);
+        }
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+    items.forEach(el => io.observe(el));
+  } else {
+    items.forEach(el => el.classList.add("in"));
+  }
+</script>
+</body>
+</html>

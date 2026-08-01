@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The integration tax — Scott Parker</title>
+<meta name="description" content="Every vendor says they integrate. The cost was never the connection — it's the reconciliation you inherit forever.">
+<link rel="canonical" href="https://rker.me/writing/the-integration-tax">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="The integration tax">
+<meta property="og:description" content="Every vendor says they integrate. The cost was never the connection.">
+<meta property="og:url" content="https://rker.me/writing/the-integration-tax">
+<meta property="og:image" content="https://rker.me/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <a class="home" href="/">P<span class="at">@</span>rker</a>
+    <nav aria-label="Pages">
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/writing/">writing</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </header>
+
+  <main class="article">
+    <!-- Remove this banner when you've made the post your own -->
+    <p class="draft">Draft — written to be rewritten.</p>
+
+    <p class="post-meta">Draft · Systems</p>
+    <h1>The integration tax</h1>
+
+    <p class="lede">
+      Every vendor in this industry says they integrate. Almost all of them are telling the truth,
+      and almost none of them are telling you the whole story.
+    </p>
+
+    <p>
+      Ask about integration in a sales meeting and you'll get a yes. There is an API. There is a
+      certified connector. There may even be a logo slide with your other systems on it. All of that
+      is real. What it describes is a <em>connection</em> — the pipe existing and data moving through
+      it. The pipe is the cheap part.
+    </p>
+
+    <p>
+      The expensive part arrives about six weeks after go-live, when someone notices the revenue
+      figure in the reporting layer doesn't match the figure in the PMS, and both are defensible.
+    </p>
+
+    <h2>Where the cost actually lives</h2>
+
+    <p>
+      Two systems can be perfectly connected and still disagree, because they were never asked to
+      agree on the questions underneath the data:
+    </p>
+
+    <ul>
+      <li><strong>When does a night belong to a date?</strong> Systems disagree about the boundary, and the disagreement only shows up at month end.</li>
+      <li><strong>Is that figure gross or net?</strong> Tax handling is the single most reliable source of a two-percent variance nobody can explain.</li>
+      <li><strong>What counts as revenue?</strong> Cancellations, no-shows, deposits, credits and adjustments each get treated differently by each platform.</li>
+      <li><strong>What happens to a modified booking?</strong> One system amends a record in place; the other writes a new one and leaves the old.</li>
+      <li><strong>Who wins a conflict?</strong> When both sides have changed the same record, someone has to lose, and the connector rarely tells you who.</li>
+    </ul>
+
+    <p>
+      None of these are bugs. They're modelling decisions, made independently by different vendors
+      solving different problems, and the connector's job was never to reconcile them. It was to
+      move the data.
+    </p>
+
+    <blockquote>
+      An integration doesn't fail loudly. It drifts quietly, and you find out from a number that
+      looks slightly wrong to someone who knows the business well enough to notice.
+    </blockquote>
+
+    <h2>The tax is ongoing, not upfront</h2>
+
+    <p>
+      This is what gets underestimated in the business case. The build has a cost and an end date.
+      The tax has neither. Every connected system adds a permanent obligation: something to monitor,
+      something to reconcile, something that breaks when the vendor ships an update you didn't know
+      about.
+    </p>
+
+    <p>
+      Two systems is one relationship. Six systems is fifteen possible relationships, and while you
+      won't connect all of them, you will end up owning more than you planned. That's the curve that
+      surprises people — not the first integration, but the fifth.
+    </p>
+
+    <h2>What actually helps</h2>
+
+    <p>
+      I've stopped asking vendors whether they integrate, because the answer is always yes. Better
+      questions:
+    </p>
+
+    <ul>
+      <li><strong>What's your definition of the fields I care about?</strong> Get it in writing, before contract.</li>
+      <li><strong>What happens when the connection drops for four hours?</strong> Does it backfill, or is that day quietly gone?</li>
+      <li><strong>How do I know it broke?</strong> If the answer is "you'll notice", it will be a month before you do.</li>
+      <li><strong>Can I read the data myself?</strong> Direct access to the underlying data beats a report you're not allowed to question.</li>
+    </ul>
+
+    <p>
+      And then build the reconciliation anyway. A small, boring, automated check that compares the
+      two sides daily and shouts when they diverge is worth more than any amount of vendor
+      assurance. It's not glamorous work. It's the difference between finding a variance in a day
+      and finding it in a quarter.
+    </p>
+
+    <p>
+      The integration tax isn't avoidable. It's the cost of running a stack instead of a single
+      product, and running a stack is usually the right call. But it should be on the invoice — in
+      the business case, in the resourcing, and in whoever's job description ends up owning it.
+    </p>
+  </main>
+
+  <footer class="foot">
+    <span><a class="u" href="/writing/">← all writing</a></span>
+    <nav aria-label="Pages">
+      <a class="u" href="/">home</a>
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </footer>
+</div>
+</body>
+</html>

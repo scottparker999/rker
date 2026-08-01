@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your BI is only as good as your front desk — Scott Parker</title>
+<meta name="description" content="You cannot dashboard your way out of bad capture. Data quality is an operational problem wearing a technical costume.">
+<link rel="canonical" href="https://rker.me/writing/front-desk-data">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="Your BI is only as good as your front desk">
+<meta property="og:description" content="You cannot dashboard your way out of bad capture.">
+<meta property="og:url" content="https://rker.me/writing/front-desk-data">
+<meta property="og:image" content="https://rker.me/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <a class="home" href="/">P<span class="at">@</span>rker</a>
+    <nav aria-label="Pages">
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/writing/">writing</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </header>
+
+  <main class="article">
+    <p class="draft">Draft — written to be rewritten.</p>
+
+    <p class="post-meta">Draft · Data</p>
+    <h1>Your BI is only as good as your front desk</h1>
+
+    <p class="lede">
+      Reporting doesn't create truth. It magnifies whatever was typed in at three o'clock on a
+      Saturday by someone with a queue behind them.
+    </p>
+
+    <p>
+      There's a particular kind of project that goes like this. The reporting is unreliable, so the
+      business invests in better reporting. New warehouse, new semantic layer, new dashboards,
+      genuinely good work. Six months later the numbers are prettier, faster and still wrong, and
+      now they're wrong with more authority.
+    </p>
+
+    <p>
+      Nothing was mis-built. The problem was never in the reporting layer. It was at the point of
+      capture, and no amount of downstream engineering fixes an upstream blank.
+    </p>
+
+    <h2>What bad capture actually looks like</h2>
+
+    <p>
+      It's rarely dramatic. It's small, rational shortcuts taken by people under time pressure:
+    </p>
+
+    <ul>
+      <li>The email field filled with a placeholder, because the booking won't save without one.</li>
+      <li>Every walk-in coded to the same generic source, because it's first in the dropdown.</li>
+      <li>A guest who's stayed eleven times existing as eleven separate profiles.</li>
+      <li>Group bookings entered under one name, so the pax count is right and everything else isn't.</li>
+      <li>The notes field doing the work of six proper fields, because it's the only one that never complains.</li>
+    </ul>
+
+    <p>
+      Every one of those is a sensible decision for the person making it. They're being measured on
+      the queue, not on the data warehouse. The system asked for something that didn't help them do
+      their job, so they gave it the cheapest possible answer.
+    </p>
+
+    <blockquote>
+      If a field is optional, it is empty. If a field is mandatory but useless, it is wrong. Those
+      are the only two states.
+    </blockquote>
+
+    <h2>Treat it as an operations problem</h2>
+
+    <p>
+      The instinct is to fix this with training, and training helps for about a fortnight. What
+      lasts is changing the economics of the shortcut.
+    </p>
+
+    <p>
+      <strong>Make the right answer the fast answer.</strong> If accurate source coding takes four
+      clicks and the lazy option takes one, you've already chosen the outcome. Reorder the dropdown.
+      Default the common case. Remove the fields nobody uses so the ones that matter feel less like
+      a toll gate.
+    </p>
+
+    <p>
+      <strong>Validate at entry, not at report.</strong> A rule that catches a malformed email while
+      the guest is still standing there is worth more than a monthly exception report nobody's
+      accountable for.
+    </p>
+
+    <p>
+      <strong>Measure the capture, not just the outcome.</strong> This is the part most operators
+      skip. If nobody is scored on data completeness, it competes with everything that is scored —
+      and loses. Put a number on it. Make it visible per site, per shift, per person if you have to.
+      A simple composite score, published and compared, changes behaviour faster than any policy
+      document.
+    </p>
+
+    <p>
+      <strong>Close the loop.</strong> Tell the front desk what the data was for. "Marketing needs
+      emails" is abstract. "We sent an offer to eight hundred past guests and forty of them came
+      back, and that's why the field matters" is not. People will fill in a field they believe in.
+    </p>
+
+    <h2>The uncomfortable bit</h2>
+
+    <p>
+      Improving capture makes your numbers look worse before they look better. Suddenly the guest
+      database has fewer contactable records, because the fake ones got cleaned out. The subscriber
+      rate drops because it's finally honest.
+    </p>
+
+    <p>
+      That's the moment the project either survives or quietly dies. It helps enormously to warn
+      everybody in advance that the dip is coming, what it means, and roughly how big it'll be. A
+      metric that gets worse for the right reason needs a story attached, or someone will decide the
+      old way was better.
+    </p>
+
+    <p>
+      Good reporting is worth building. Just build it knowing that it's a mirror, not a filter, and
+      a mirror is only as useful as whatever you point it at.
+    </p>
+  </main>
+
+  <footer class="foot">
+    <span><a class="u" href="/writing/">← all writing</a></span>
+    <nav aria-label="Pages">
+      <a class="u" href="/">home</a>
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </footer>
+</div>
+</body>
+</html>

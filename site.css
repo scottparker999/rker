@@ -1,0 +1,258 @@
+/* ==========================================================
+   rker.me — shared styles for interior pages
+   (index.html stays self-contained by design)
+   ========================================================== */
+
+:root {
+  color-scheme: light dark;
+  --paper:  #FBFAF7;
+  --ink:    #1A1A1A;
+  --muted:  #6B6B6B;
+  --line:   #E7E4DD;
+  --accent: #4B3BFF;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:  #131210;
+    --ink:    #ECEAE3;
+    --muted:  #8A8781;
+    --line:   #2A2824;
+    --accent: #8674FF;
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 1.02rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  padding: 3.5rem 1.5rem 5rem;
+}
+
+.wrap { max-width: 46rem; margin-inline: auto; }
+.narrow { max-width: 38rem; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 3.5rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.8rem;
+}
+.home {
+  font-weight: 700;
+  font-size: 1.15rem;
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-decoration: none;
+}
+.home .at { color: var(--accent); display: inline-block; transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+.home:hover .at { transform: rotate(360deg); }
+
+.topbar nav { display: flex; gap: 1.2rem; }
+
+a.u {
+  color: var(--ink);
+  text-decoration: none;
+  position: relative;
+  padding-bottom: 2px;
+}
+a.u::after {
+  content: "";
+  position: absolute;
+  left: 0; bottom: 0;
+  width: 100%; height: 1.5px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+a.u:hover::after, a.u:focus-visible::after { transform: scaleX(1); }
+a.u:focus-visible { outline: none; color: var(--accent); }
+a.u[aria-current="page"] { color: var(--accent); }
+
+/* ---------- headings ---------- */
+.eyebrow {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.9rem;
+}
+h1 {
+  font-size: clamp(2.1rem, 6.5vw, 3.2rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+  margin-bottom: 1.1rem;
+}
+h2 {
+  font-size: 1.05rem;
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 1rem;
+}
+h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.35rem; letter-spacing: -0.01em; }
+
+.lede {
+  font-size: clamp(1.1rem, 3vw, 1.3rem);
+  color: var(--muted);
+  line-height: 1.55;
+  margin-bottom: 3rem;
+}
+
+p { margin-bottom: 1.15rem; }
+p:last-child { margin-bottom: 0; }
+
+/* ---------- sections ---------- */
+.section {
+  display: grid;
+  grid-template-columns: 11rem 1fr;
+  gap: 2rem;
+  padding: 2.25rem 0;
+  border-top: 1px solid var(--line);
+}
+.section > div p { color: var(--muted); }
+.section > div strong { color: var(--ink); font-weight: 500; }
+@media (max-width: 640px) {
+  .section { grid-template-columns: 1fr; gap: 0.9rem; padding: 1.9rem 0; }
+}
+
+/* ---------- tag chips ---------- */
+.tags { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 1rem; }
+.tag {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+.tag:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.8rem;
+  color: var(--paper);
+  background: var(--accent);
+  border: 0;
+  border-radius: 999px;
+  padding: 0.6rem 1.1rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.btn:hover { transform: translateY(-1px); opacity: 0.92; }
+.btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+/* ---------- post list ---------- */
+.post-list { list-style: none; }
+.post-list li { border-top: 1px solid var(--line); }
+.post-list a {
+  display: block;
+  padding: 1.6rem 0;
+  text-decoration: none;
+  color: var(--ink);
+  transition: padding-left 0.25s ease;
+}
+.post-list a:hover, .post-list a:focus-visible { padding-left: 0.6rem; outline: none; }
+.post-list a:hover h3, .post-list a:focus-visible h3 { color: var(--accent); }
+.post-list .meta,
+.post-meta {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.post-list .excerpt { color: var(--muted); font-size: 0.95rem; margin-top: 0.35rem; }
+
+/* ---------- article body ---------- */
+.article { max-width: 36rem; }
+.article h2 { font-family: "Space Grotesk", sans-serif; font-size: 1.35rem; letter-spacing: -0.01em; margin: 2.4rem 0 0.8rem; }
+.article blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: 1.1rem;
+  margin: 1.6rem 0;
+  color: var(--muted);
+  font-style: italic;
+}
+.article ul { margin: 0 0 1.15rem 1.1rem; color: var(--ink); }
+.article li { margin-bottom: 0.45rem; }
+.article code {
+  font-family: "Space Mono", monospace;
+  font-size: 0.86em;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  padding: 0.12em 0.38em;
+  border-radius: 4px;
+}
+
+/* ---------- draft banner ---------- */
+.draft {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--accent);
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 2rem;
+}
+
+/* ---------- footer ---------- */
+.foot {
+  margin-top: 4rem;
+  padding-top: 1.8rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.4rem;
+  align-items: center;
+  justify-content: space-between;
+  font-family: "Space Mono", monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.foot .at-small { color: var(--accent); }
+.foot nav { display: flex; gap: 1.2rem; }
+
+/* ---------- entrance animation ---------- */
+.reveal { opacity: 0; transform: translateY(16px); }
+.reveal.in { opacity: 1; transform: none; transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::after { animation: none !important; transition: none !important; }
+  .reveal { opacity: 1 !important; transform: none !important; }
+}
+
+/* ==========================================================
+   PRINT — turns /cv into a clean PDF via Cmd/Ctrl+P
+   ========================================================== */
+@media print {
+  @page { margin: 16mm; }
+  :root { --paper: #fff; --ink: #000; --muted: #444; --line: #ccc; --accent: #000; }
+  body { background: #fff; color: #000; padding: 0; font-size: 10.5pt; line-height: 1.45; }
+  .topbar nav, .btn, .no-print, .foot nav { display: none !important; }
+  .reveal { opacity: 1 !important; transform: none !important; }
+  .wrap { max-width: none; }
+  h1 { font-size: 24pt; }
+  .lede { font-size: 11.5pt; margin-bottom: 1.2rem; }
+  .section { break-inside: avoid; padding: 0.75rem 0; grid-template-columns: 9rem 1fr; }
+  .tag { border-color: #bbb; }
+  a { color: #000; text-decoration: none; }
+  .print-contact { display: block !important; }
+}
+.print-contact { display: none; }
