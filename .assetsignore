@@ -4,3 +4,4 @@ wrangler.jsonc
 .assetsignore
 .gitignore
 README.md
+*.test.mjs

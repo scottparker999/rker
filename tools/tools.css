@@ -1,0 +1,224 @@
+/* ==========================================================
+   rker.me — styles for the calculators under /tools
+   Loaded only by tool pages, so site.css stays lean.
+   ========================================================== */
+
+/* A calculator needs more room than a prose page. Widen the shell so the
+   input grid fits without horizontal scrolling, but keep the running text
+   in .narrow so line length stays readable. */
+.wrap.tool-wrap { max-width: 62rem; }
+.tool-wrap .section { grid-template-columns: 12rem 1fr; }
+@media (max-width: 640px) {
+  .tool-wrap .section { grid-template-columns: 1fr; }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- form fields ---------- */
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1.1rem 1.4rem;
+  margin-top: 1.2rem;
+}
+.field-grid label { display: flex; flex-direction: column; gap: 0.35rem; }
+.field-grid label > span {
+  font-family: "Space Mono", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.field-grid small { color: var(--muted); font-size: 0.72rem; opacity: 0.8; }
+
+input[type="number"],
+input[type="date"],
+select {
+  font-family: "Space Mono", monospace;
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  width: 100%;
+  min-width: 0;
+  transition: border-color 0.2s ease;
+}
+select { appearance: none; cursor: pointer; }
+select option { background: var(--paper); color: var(--ink); }
+input[type="number"]:hover,
+input[type="date"]:hover,
+select:hover { border-color: var(--muted); }
+input[type="number"]:focus-visible,
+input[type="date"]:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+/* Dark mode: the native date picker icon is black-on-black without this. */
+@media (prefers-color-scheme: dark) {
+  input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; }
+}
+
+/* ---------- input + results tables ---------- */
+.table-scroll { overflow-x: auto; margin-top: 1.2rem; }
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  min-width: 41rem;
+}
+.grid caption {
+  text-align: left;
+  font-family: "Space Mono", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.6rem;
+}
+.grid th {
+  font-family: "Space Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 400;
+  text-align: left;
+  padding: 0 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.grid td {
+  padding: 0.35rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.grid td:first-child { padding-left: 0; }
+.grid input { min-width: 4.6rem; padding: 0.45rem 0.5rem; }
+.grid input[type="date"] { min-width: 8rem; }
+
+.results td {
+  font-family: "Space Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.results td:first-child { color: var(--ink); }
+.results .flag { color: var(--accent); }
+.results .pos { color: var(--ink); }
+.results .neg { color: #c0392b; }
+.results .empty { color: var(--muted); font-style: italic; padding: 1rem 0; }
+.results tr.over td { background: color-mix(in srgb, #c0392b 8%, transparent); }
+@media (prefers-color-scheme: dark) {
+  .results .neg { color: #ff8b7a; }
+}
+
+.remove {
+  font-family: "Space Mono", monospace;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.remove:hover { color: #c0392b; border-color: var(--line); }
+.remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.row-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.2rem; }
+.btn.ghost {
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+}
+.btn.ghost:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
+
+/* ---------- verdict ---------- */
+.verdict {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--muted);
+  border-radius: 10px;
+  padding: 1.1rem 1.2rem;
+  margin-top: 0.4rem;
+}
+.verdict[data-call="accept"] { border-left-color: #2e7d5b; }
+.verdict[data-call="decline"] { border-left-color: #c0392b; }
+.verdict[data-call="marginal"] { border-left-color: var(--accent); }
+.verdict-call {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink) !important;
+  margin-bottom: 0.2rem;
+}
+.verdict-net {
+  font-family: "Space Mono", monospace;
+  font-size: 0.85rem;
+  color: var(--ink) !important;
+  margin-bottom: 0.4rem;
+}
+.verdict-why { font-size: 0.9rem; margin-bottom: 0 !important; }
+
+.warn {
+  font-size: 0.82rem;
+  color: var(--ink) !important;
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  margin-bottom: 0.7rem;
+}
+
+/* ---------- headline figures ---------- */
+.figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1.2rem 1.4rem;
+  margin: 1.8rem 0 0.4rem;
+}
+.figures > div { display: flex; flex-direction: column; gap: 0.15rem; }
+.figures dt {
+  font-family: "Space Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.figures dd {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.figures small { color: var(--muted); font-size: 0.7rem; line-height: 1.35; }
+
+.fineprint { font-size: 0.8rem; opacity: 0.8; }
+
+/* ---------- print ---------- */
+@media print {
+  .row-actions, .remove, .warn { display: none !important; }
+  .table-scroll { overflow: visible; }
+  .grid { min-width: 0; font-size: 8.5pt; }
+  .verdict { break-inside: avoid; border: 1px solid #ccc; border-left: 3px solid #000; }
+  .figures { break-inside: avoid; }
+  input[type="number"], input[type="date"] {
+    border: 0;
+    padding: 0;
+    color: #000;
+    font-size: 8.5pt;
+  }
+}

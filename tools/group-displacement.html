@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Group displacement calculator — rker.me</title>
+<meta name="description" content="Work out whether a group booking is worth taking: per-night displacement, contribution after commission and variable cost, and the breakeven group rate. Runs entirely in your browser.">
+<link rel="canonical" href="https://rker.me/tools/group-displacement">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Group displacement calculator">
+<meta property="og:description" content="Does this group contribute more than the transient business it pushes out? Per-night displacement, contribution and breakeven rate.">
+<meta property="og:url" content="https://rker.me/tools/group-displacement">
+<meta property="og:image" content="https://rker.me/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="stylesheet" href="/fonts.css">
+<link rel="stylesheet" href="/site.css">
+<link rel="stylesheet" href="/tools/tools.css">
+<noscript><style>.reveal{opacity:1 !important;transform:none !important}</style></noscript>
+
+</head>
+<body>
+<div class="wrap tool-wrap">
+
+  <header class="topbar">
+    <a class="home" href="/">P<span class="at">@</span>rker</a>
+    <nav aria-label="Pages">
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/writing/">writing</a>
+      <a class="u" href="/tools/" aria-current="page">tools</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </header>
+
+  <main>
+    <p class="eyebrow reveal">Tool</p>
+    <h1 class="reveal">Group displacement calculator.</h1>
+    <p class="lede reveal narrow">
+      A group request is only worth what it contributes <em>after</em> the transient business it
+      pushes out. This works that through night by night, on contribution rather than rate.
+    </p>
+
+    <noscript>
+      <p class="draft">This calculator needs JavaScript. It runs entirely in your browser — nothing is sent anywhere.</p>
+    </noscript>
+
+    <form id="calc" autocomplete="off">
+
+      <section class="section reveal">
+        <h2>The house</h2>
+        <div>
+          <p>
+            Costs that apply to every occupied room, however it was booked. These are what turn a
+            rate comparison into a contribution comparison.
+          </p>
+          <div class="field-grid">
+            <label>
+              <span>Currency</span>
+              <select id="currency">
+                <option value="AUD" selected>AUD — Australian dollar</option>
+                <option value="NZD">NZD — New Zealand dollar</option>
+                <option value="USD">USD — US dollar</option>
+                <option value="GBP">GBP — Pound sterling</option>
+                <option value="EUR">EUR — Euro</option>
+                <option value="SGD">SGD — Singapore dollar</option>
+              </select>
+              <small>Display only — no conversion is applied.</small>
+            </label>
+            <label>
+              <span>Variable cost per occupied room</span>
+              <input type="number" id="variableCostPerRoom" value="28" min="0" step="0.01" inputmode="decimal">
+              <small>Housekeeping, laundry, amenities, utilities.</small>
+            </label>
+            <label>
+              <span>Transient distribution cost</span>
+              <input type="number" id="transientCommissionPct" value="15" min="0" max="100" step="0.1" inputmode="decimal">
+              <small>Blended OTA commission, % of room revenue.</small>
+            </label>
+            <label>
+              <span>Group commission</span>
+              <input type="number" id="groupCommissionPct" value="10" min="0" max="100" step="0.1" inputmode="decimal">
+              <small>Planner or third-party intermediary, % of room revenue.</small>
+            </label>
+            <label>
+              <span>Wash / attrition</span>
+              <input type="number" id="washPct" value="10" min="0" max="100" step="0.1" inputmode="decimal">
+              <small>% of the block you expect not to materialise.</small>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal">
+        <h2>The stay</h2>
+        <div>
+          <p>
+            One row per night. Transient demand is <strong>unconstrained</strong> — what you would
+            sell if you had the rooms, not what is currently on the books.
+          </p>
+
+          <div class="table-scroll">
+            <table class="grid" id="nights">
+              <caption class="sr-only">Nightly inputs for the group stay</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Capacity</th>
+                  <th scope="col">On the books</th>
+                  <th scope="col">Transient demand</th>
+                  <th scope="col">Transient ADR</th>
+                  <th scope="col">Group rooms</th>
+                  <th scope="col">Group rate</th>
+                  <th scope="col"><span class="sr-only">Remove</span></th>
+                </tr>
+              </thead>
+              <tbody id="nightRows"></tbody>
+            </table>
+          </div>
+
+          <p class="row-actions no-print">
+            <button class="btn ghost" type="button" id="addNight">+ Add night</button>
+            <button class="btn ghost" type="button" id="resetAll">Reset</button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section reveal">
+        <h2>Ancillary</h2>
+        <div>
+          <p>
+            Total expected spend across the whole group, with the margin you actually keep. Leaving
+            this out is what makes a calculator decline groups it should take.
+          </p>
+          <div class="field-grid">
+            <label>
+              <span>Food &amp; beverage revenue</span>
+              <input type="number" id="foodBeverageRevenue" value="9000" min="0" step="0.01" inputmode="decimal">
+            </label>
+            <label>
+              <span>F&amp;B margin</span>
+              <input type="number" id="foodBeverageMarginPct" value="30" min="0" max="100" step="0.1" inputmode="decimal">
+              <small>% kept after cost of sales and labour.</small>
+            </label>
+            <label>
+              <span>Meeting space revenue</span>
+              <input type="number" id="meetingSpaceRevenue" value="2500" min="0" step="0.01" inputmode="decimal">
+            </label>
+            <label>
+              <span>Meeting space margin</span>
+              <input type="number" id="meetingSpaceMarginPct" value="85" min="0" max="100" step="0.1" inputmode="decimal">
+            </label>
+            <label>
+              <span>Other revenue</span>
+              <input type="number" id="otherRevenue" value="0" min="0" step="0.01" inputmode="decimal">
+              <small>Parking, AV, spa, resort fees.</small>
+            </label>
+            <label>
+              <span>Other margin</span>
+              <input type="number" id="otherMarginPct" value="70" min="0" max="100" step="0.1" inputmode="decimal">
+            </label>
+          </div>
+        </div>
+      </section>
+    </form>
+
+    <section class="section reveal">
+      <h2>Verdict</h2>
+      <div>
+        <div id="warnings" role="status" aria-live="polite"></div>
+
+        <div class="verdict" id="verdict">
+          <p class="verdict-call" id="verdictCall">—</p>
+          <p class="verdict-net" id="verdictNet"></p>
+          <p class="verdict-why" id="verdictWhy"></p>
+        </div>
+
+        <dl class="figures" id="figures"></dl>
+
+        <div class="table-scroll">
+          <table class="grid results">
+            <caption>Night by night</caption>
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Available</th>
+                <th scope="col">Group rooms</th>
+                <th scope="col">Displaced</th>
+                <th scope="col">Group contribution</th>
+                <th scope="col">Lost transient</th>
+                <th scope="col">Net</th>
+              </tr>
+            </thead>
+            <tbody id="resultRows"></tbody>
+          </table>
+        </div>
+
+        <p class="row-actions no-print">
+          <button class="btn" type="button" id="print">↓ Save as PDF</button>
+        </p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <h2>Method</h2>
+      <div>
+        <p>
+          <strong>Displacement is demand-limited, not size-limited.</strong> A group only displaces
+          transient business where forecast demand would otherwise have filled those rooms. Thirty
+          rooms into a soft Tuesday displaces nobody; the same thirty into a sold-out Saturday
+          displaces thirty. That is why this is calculated per night — an aggregate view averages
+          the peak away and quietly approves groups it shouldn't.
+        </p>
+        <p>
+          <strong>Contribution, not rate.</strong> A $200 transient room booked through an OTA at
+          15% with $28 of variable cost contributes $142. A $165 group room at 10% commission
+          contributes $120.50. Comparing the headline rates says the gap is $35; the real gap is
+          $21.50. Rate comparisons systematically overstate the cost of group business.
+        </p>
+        <p>
+          <strong>Ancillary counts.</strong> For most groups the rooms are not the whole trade.
+          Meeting space and food and beverage are entered at the margin you keep, not the revenue
+          you invoice, so they can be compared with room contribution on the same footing.
+        </p>
+        <p>
+          <strong>Wash is applied before the analysis.</strong> Blocks rarely pick up in full, so
+          both the revenue and the displacement are calculated on expected materialised rooms. This
+          assumes unsold rooms are released at cutoff and can still be sold to transient — if your
+          contract holds inventory to arrival, set wash to zero.
+        </p>
+        <p>
+          <strong>The breakeven rate</strong> is the flat room rate at which the group exactly
+          covers what it displaces, given everything else on this page. Below it you are buying
+          occupancy with contribution. It is a floor for the negotiation, not a target.
+        </p>
+        <p>
+          What this deliberately does not model: rate dilution into future periods, the value of a
+          repeat or multi-year relationship, contracted attrition and cancellation damages, length
+          of stay shoulder effects, or the difference between displacing your lowest-rated transient
+          and your average one. Those are judgement, and a calculator that pretends otherwise is
+          worse than one that leaves the room for it.
+        </p>
+        <p class="fineprint">
+          Everything here runs in your browser. No figures are sent anywhere, nothing is stored, and
+          there is no analytics on this page.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span><a class="u" href="/tools/">← all tools</a></span>
+    <nav aria-label="Pages">
+      <a class="u" href="/">home</a>
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/writing/">writing</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </footer>
+</div>
+
+<script type="module">
+  import { analyse, verdict } from '/tools/displacement.js';
+
+  const $ = (id) => document.getElementById(id);
+
+  const SETTING_IDS = [
+    'variableCostPerRoom', 'transientCommissionPct', 'groupCommissionPct', 'washPct',
+  ];
+  const ANCILLARY_IDS = [
+    'foodBeverageRevenue', 'foodBeverageMarginPct',
+    'meetingSpaceRevenue', 'meetingSpaceMarginPct',
+    'otherRevenue', 'otherMarginPct',
+  ];
+
+  const COLUMNS = [
+    { key: 'date', type: 'date', label: 'Date' },
+    { key: 'capacity', type: 'number', label: 'Capacity', min: 0, step: 1 },
+    { key: 'onTheBooks', type: 'number', label: 'On the books', min: 0, step: 1 },
+    { key: 'transientDemand', type: 'number', label: 'Transient demand', min: 0, step: 1 },
+    { key: 'transientAdr', type: 'number', label: 'Transient ADR', min: 0, step: 0.01 },
+    { key: 'groupRooms', type: 'number', label: 'Group rooms', min: 0, step: 1 },
+    { key: 'groupRate', type: 'number', label: 'Group rate', min: 0, step: 0.01 },
+  ];
+
+  // A worked example on load beats an empty grid: it shows the shape of the
+  // inputs and demonstrates a stay that displaces on one night but not the other.
+  const seedDate = (offset) => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30 + offset);
+    return d.toISOString().slice(0, 10);
+  };
+  const SEED = [
+    { date: seedDate(0), capacity: 120, onTheBooks: 48, transientDemand: 55, transientAdr: 189, groupRooms: 40, groupRate: 155 },
+    { date: seedDate(1), capacity: 120, onTheBooks: 66, transientDemand: 84, transientAdr: 232, groupRooms: 40, groupRate: 155 },
+    { date: seedDate(2), capacity: 120, onTheBooks: 39, transientDemand: 41, transientAdr: 175, groupRooms: 40, groupRate: 155 },
+  ];
+
+  const rooms = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
+
+  // Rebuilt whenever the currency changes; formatters are not cheap to make
+  // per cell, so they are cached between renders.
+  let money, money2, moneyCurrency;
+  function formatters() {
+    const currency = $('currency').value;
+    if (currency !== moneyCurrency) {
+      moneyCurrency = currency;
+      money = new Intl.NumberFormat(undefined, {
+        style: 'currency', currency, maximumFractionDigits: 0,
+      });
+      money2 = new Intl.NumberFormat(undefined, {
+        style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2,
+      });
+    }
+  }
+
+  function nightRow(seed) {
+    const tr = document.createElement('tr');
+    for (const col of COLUMNS) {
+      const td = document.createElement('td');
+      const input = document.createElement('input');
+      input.type = col.type;
+      input.dataset.key = col.key;
+      input.value = seed[col.key] ?? '';
+      input.setAttribute('aria-label', col.label);
+      if (col.type === 'number') {
+        input.min = col.min;
+        input.step = col.step;
+        input.inputMode = 'decimal';
+      }
+      td.appendChild(input);
+      tr.appendChild(td);
+    }
+    const remove = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'remove no-print';
+    btn.textContent = '×';
+    btn.title = 'Remove night';
+    btn.setAttribute('aria-label', 'Remove night');
+    btn.addEventListener('click', () => { tr.remove(); render(); });
+    remove.appendChild(btn);
+    tr.appendChild(remove);
+    return tr;
+  }
+
+  function readInput() {
+    const nights = [...$('nightRows').querySelectorAll('tr')].map((tr) => {
+      const night = {};
+      tr.querySelectorAll('input').forEach((i) => { night[i.dataset.key] = i.value; });
+      return night;
+    });
+    const input = { nights, ancillary: {} };
+    SETTING_IDS.forEach((id) => { input[id] = $(id).value; });
+    ANCILLARY_IDS.forEach((id) => { input.ancillary[id] = $(id).value; });
+    return input;
+  }
+
+  function figure(dl, term, value, note) {
+    const d = document.createElement('div');
+    const dt = document.createElement('dt');
+    dt.textContent = term;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    d.append(dt, dd);
+    if (note) {
+      const small = document.createElement('small');
+      small.textContent = note;
+      d.appendChild(small);
+    }
+    dl.appendChild(d);
+  }
+
+  function render() {
+    formatters();
+    const result = analyse(readInput());
+    const t = result.totals;
+    const call = verdict(t);
+
+    // --- verdict ---------------------------------------------------------
+    const CALLS = {
+      accept: ['Take it', 'contributes more than it displaces'],
+      decline: ['Decline, or renegotiate', 'displaces more than it contributes'],
+      marginal: ['Line ball', 'contribution and displacement are within a few percent'],
+    };
+    const [headline, why] = CALLS[call];
+    $('verdict').dataset.call = call;
+    $('verdictCall').textContent = headline;
+    $('verdictNet').textContent = `${t.netBenefit >= 0 ? '+' : '−'}${money.format(Math.abs(t.netBenefit))} net contribution`;
+    $('verdictWhy').textContent = `The group ${why}.`;
+
+    // --- headline figures ------------------------------------------------
+    const dl = $('figures');
+    dl.replaceChildren();
+    figure(dl, 'Group contribution', money.format(t.totalGroupContribution),
+      `${money.format(t.totalGroupRevenue)} revenue, after commission and variable cost`);
+    figure(dl, 'Displaced transient', money.format(t.lostTransientContribution),
+      `${rooms.format(t.displacedRoomNights)} room nights at ${money.format(t.displacedAdr)} ADR`);
+    figure(dl, 'Net benefit', money.format(t.netBenefit),
+      'Group contribution less displaced contribution');
+    figure(dl, 'Breakeven group rate',
+      t.breakevenGroupRate === null ? '—' : money2.format(t.breakevenGroupRate),
+      'Flat rate at which the group exactly covers what it displaces');
+    figure(dl, 'Group room nights', rooms.format(t.groupRoomNights),
+      `After wash, at ${money.format(t.groupAdr)} ADR`);
+    figure(dl, 'Ancillary contribution', money.format(t.ancillaryContribution),
+      `${money.format(t.ancillaryRevenue)} revenue at blended margin`);
+
+    // --- per night -------------------------------------------------------
+    const body = $('resultRows');
+    body.replaceChildren();
+    for (const n of result.nights) {
+      const net = n.groupRoomsContribution - n.lostTransientContribution;
+      const tr = document.createElement('tr');
+      if (!n.fits) tr.className = 'over';
+      const cells = [
+        n.date || '—',
+        rooms.format(n.available),
+        rooms.format(n.groupRoomsMaterialised),
+        rooms.format(n.displacedRooms),
+        money.format(n.groupRoomsContribution),
+        money.format(n.lostTransientContribution),
+        money.format(net),
+      ];
+      cells.forEach((text, i) => {
+        const td = document.createElement('td');
+        td.textContent = text;
+        if (i === 3 && n.displacedRooms > 0) td.classList.add('flag');
+        if (i === 6) td.classList.add(net >= 0 ? 'pos' : 'neg');
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    }
+    if (!result.nights.length) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 7;
+      td.className = 'empty';
+      td.textContent = 'Add a night to see the analysis.';
+      tr.appendChild(td);
+      body.appendChild(tr);
+    }
+
+    // --- warnings --------------------------------------------------------
+    const warn = $('warnings');
+    warn.replaceChildren();
+    for (const w of result.warnings) {
+      const p = document.createElement('p');
+      p.className = 'warn';
+      p.textContent = w;
+      warn.appendChild(p);
+    }
+  }
+
+  function seed() {
+    $('nightRows').replaceChildren(...SEED.map(nightRow));
+  }
+
+  $('addNight').addEventListener('click', () => {
+    const rowsEl = $('nightRows');
+    const last = rowsEl.querySelector('tr:last-child');
+    const template = {};
+    if (last) {
+      last.querySelectorAll('input').forEach((i) => { template[i.dataset.key] = i.value; });
+      if (template.date) {
+        const d = new Date(template.date);
+        d.setDate(d.getDate() + 1);
+        template.date = d.toISOString().slice(0, 10);
+      }
+    }
+    rowsEl.appendChild(nightRow(template));
+    render();
+  });
+
+  $('resetAll').addEventListener('click', () => { seed(); render(); });
+  $('print').addEventListener('click', () => window.print());
+  document.addEventListener('input', render);
+  document.addEventListener('change', render); // selects and date pickers
+
+  seed();
+  render();
+
+  // Reveal-on-scroll, matching the rest of the site.
+  const items = document.querySelectorAll('.reveal');
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          e.target.style.transitionDelay = (i * 60) + 'ms';
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+    items.forEach((el) => io.observe(el));
+  } else {
+    items.forEach((el) => el.classList.add('in'));
+  }
+</script>
+</body>
+</html>

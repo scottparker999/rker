@@ -14,6 +14,7 @@ no build step, no framework.
 | `robots.txt`, `sitemap.xml`, `llms.txt` | Crawler / SEO / LLM discovery. |
 | `_headers` | Security headers (Cloudflare Pages syntax). |
 | `fonts.css`, `fonts/` | Self-hosted Space Grotesk / Space Mono (woff2, SIL OFL). |
+| `tools/` | Browser-side calculators. `displacement.js` holds the maths; run its tests with `node --test tools/displacement.test.mjs`. |
 
 ## Editing
 

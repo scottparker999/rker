@@ -9,12 +9,16 @@
 ## Pages
 - [CV](https://rker.me/cv): narrative career summary and capabilities
 - [Writing](https://rker.me/writing/): notes on hospitality systems
+- [Tools](https://rker.me/tools/): free browser-based calculators for hospitality decisions
 - [Colophon](https://rker.me/colophon): how this site is built
 
 ## Writing
 - [The integration tax](https://rker.me/writing/the-integration-tax): why connecting systems is the cheap part and reconciliation is the ongoing cost
 - [Your BI is only as good as your front desk](https://rker.me/writing/front-desk-data): data quality as an operational problem, not a reporting one
 - [What operators get wrong when buying a PMS](https://rker.me/writing/buying-a-pms): data model and data access matter more than the feature matrix
+
+## Tools
+- [Group displacement calculator](https://rker.me/tools/group-displacement): whether a group booking contributes more than the transient business it displaces — per-night displacement, contribution after commission and variable cost, and breakeven group rate
 
 ## Contact
 - Email: p@rker.me
