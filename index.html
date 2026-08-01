@@ -1,213 +1,9 @@
-For your security, sign in again to keep using Claude.
-Claude finished the response
-Here's a spread, grouped by what they'd actually do for you.
-
-Credibility / professional
-
-/cv — the natural next page. Your 20 years, systems you've worked across, integrations you've built. Print-friendly CSS so it doubles as a PDF, and it gives your LinkedIn a home that you control.
-/stack — the tools you know cold: Newbook, Power BI, Snowflake, RMS/POS platforms. A specialist's "here's my kit" page. Very fast to scan, very legible to recruiters and peers.
-/work or /projects — the anonymised versions of what you build. Dashboards, calculators, Chrome extensions. Screenshots plus the problem-it-solved framing.
-The genuinely interesting one
-
-/writing or /notes — short posts on hospitality systems. There's almost nobody writing well about PMS/RMS/BI integration from an operator's seat, and it's the kind of niche where five good posts make you the person people find. This is also the page that would justify the markdown-for-AI thing we just discussed.
-Utility (public but useful)
-
-/tools — a hub for small standalone calculators. You already build these; a public, generic version of something like a displacement or ADR calculator would get used and linked.
-/uses — the hardware/software/desk setup page. A small internet tradition, low effort, surprisingly popular.
-Personal / character
-
-/now — what you're focused on this month. A nownownow.com-style page. Cheap to maintain, makes the site feel alive rather than static.
-/colophon — how this site is built and why. Given the care in the build, this one writes itself and quietly demonstrates competence.
-/uk or an about page leaning into the dual-citizen story — how you got from the UK to the Gold Coast.
-Practical / private-ish
-
-/links — a personal shortlink index, or just a curated set of things worth reading in your field.
-A subdomain toolbox rather than pages — tools.rker.me, cv.rker.me — if you'd rather keep the root page pristine.
-If I had to pick two to actually build: /cv (highest practical value, and the site currently gives a visitor nowhere to go) and /colophon (nearly free, and it's the page that shows the craft). /writing is the highest-ceiling one but the only one that needs ongoing effort.
-
-Which direction pulls at you — professional credibility, or the more personal/playful end?
-
-Yeah.I like your two ideas and the writing one sound good
-
-Good picks — and they stack nicely: /cv gives visitors somewhere to go, /colophon shows the craft, /writing is the one with a ceiling.
-
-Before I build anything, a few decisions that meaningfully change the shape:
-
-On /cv — the big fork is CV vs career narrative. A real CV means dates, employers, and titles (including Ingenia). A narrative version — "twenty years across PMS, RMS, BI; here's what I've solved" — is anonymised and ages better. Given this is a personal domain and your work is current, I'd lean narrative, but your call. Also: do you want it print-friendly so it doubles as a PDF?
-
-On /writing — the real question is publishing workflow. Options, easiest first:
-
-Hand-written HTML per post — no dependencies, fits your single-file instincts, but you're writing HTML each time.
-Markdown files + a tiny build step — you write .md, a build turns it into pages. Cleaner long-term, but adds a build to your currently zero-build repo.
-One long page with all posts stacked — dead simple, works fine for the first handful of posts.
-Given your setup, I'd start with 3 or 1 and only graduate to 2 if you're actually posting regularly. No point adding a pipeline for content that might be two posts.
-
-Two more things that affect all three pages:
-
-Navigation — right now the homepage has no nav at all, which is part of its charm. Adding pages means adding something. I'd suggest a very minimal text nav rather than breaking the clean single-screen look.
-Order — I'd build /colophon first (it's nearly free and needs no decisions from you), then /cv, then scaffold /writing with one placeholder post.
-So: narrative or dated CV? And do you have a first post in mind for /writing, or should I scaffold it with a placeholder and let you fill it?
-
-Narrative sounds good. Would be nice if the page had some character and animation to it, but a downloadable version would be good to have too. 
-
-Maybe 1. Draft me some posts and I will update / replace them
-
-Yes, maybe links to these pages go at the bottom of the page?
-
-
-Architected animated CV, drafted substantive posts, planned navigation structure
-Architected animated CV, drafted substantive posts, planned navigation structure
-Good — all three, with posts drafted for you to swap out. Let me sort one thing first: your repo still has the inline-script version of index.html, so I'll revert my copy to match. That way you commit one file and nothing breaks.
-
-
-Architected footer restructuring to balance fixed positioning with responsive design constraints
-Architected footer restructuring to balance fixed positioning with responsive design constraints
-Now the footer nav on the homepage:
-
-
-Resolved CSS cascade issue and commenced stylesheet development
-Resolved CSS cascade issue and commenced stylesheet development
-Now the shared stylesheet for the new pages:
-
-
-Architected animated CV layout with scroll reveals and print functionality
-Architected animated CV layout with scroll reveals and print functionality
-Now the CV — narrative, animated, and print-ready:
-
-
-Orchestrated blog post structure with placeholder content and navigation layout
-Orchestrated blog post structure with placeholder content and navigation layout
-Now the writing section — index plus three drafts:
-
-
-Audited reveal functionality and identified accessibility gap requiring noscript fallback
-Audited reveal functionality and identified accessibility gap requiring noscript fallback
-Good — the only flagged item is the inline favicon data URI, a false positive from my checker. But it surfaced a real robustness issue I should fix: if JavaScript is disabled, the .reveal elements would stay invisible. Adding a <noscript> fallback:
-
-
-Ran 2 commands, read a file
-Ran 2 commands, read a file
-All three pages built, plus three drafted posts.
-
-/cv — narrative, no dates or employers. Sections cover what you do, the stack (as hoverable chips), integration, how you work, the "also" list, location with the dual citizenship, and contact. Sections fade up as you scroll via IntersectionObserver. The Download as PDF button triggers window.print(), and a dedicated print stylesheet handles the rest: black on white, nav and button hidden, sections kept from breaking across pages, and a contact line that appears only in print (since the links vanish). Cmd/Ctrl+P → Save as PDF gives you a clean document.
-
-One deliberate gap: there's a "Selected work" section left as a placeholder. I didn't invent achievements or employers — that's the section worth your ten minutes, because concrete examples land harder than capability lists.
-
-/writing — index plus three drafts, each marked with a dashed "Draft" banner to remove when you've made them yours:
-
-The integration tax — connecting systems is cheap; the reconciliation you inherit forever is the real cost.
-Your BI is only as good as your front desk — data quality as an operations problem, including the bit about metrics getting worse before better.
-What operators get wrong when buying a PMS — data model and data access over the feature matrix.
-They're written in a direct, operator-grounded voice with opinions in them. Rewrite freely — they're scaffolding, and your actual experience will sharpen them considerably.
-
-/colophon — type, colour, no-build, hosting, the machine-readable layer, accessibility, and privacy. It's honest about the Google Fonts caveat rather than claiming zero third parties.
-
-Navigation is now in the homepage footer (cv · writing · colophon) above the p@rker.me line, and every interior page has a top bar plus a footer nav.
-
-Files to commit — one new folder and several files:
-
-New: site.css, cv.html, colophon.html, writing/index.html, and the three post files in writing/
-Updated: index.html, sitemap.xml, llms.txt
-Two notes worth knowing. I reverted index.html to the inline script, so it matches the _headers currently in your repo — commit it alone and nothing breaks. And interior pages share site.css rather than each carrying their own copy; the homepage stays self-contained as built.
-
-Cloudflare serves cv.html at /cv and writing/index.html at /writing/ automatically, so the clean URLs work with no config. Once it deploys, worth clicking through the CV's print preview to check the PDF looks how you want.
-
-
-Cv
-Code · HTML 
-
-Index
-Code · HTML 
-
-Colophon
-Code · HTML 
-
-Site
-Code · CSS 
-
-Index
-Code · HTML 
-
-The integration tax
-Code · HTML 
-
-Front desk data
-Code · HTML 
-
-Buying a pms
-Code · HTML 
-
-Sitemap
-XML 
-
-Llms
-TXT 
-why is there two index,htmls?
-
-Because they're in different folders — and that's exactly how a static site does sub-pages.
-
-index.html (repo root) → serves at rker.me/
-writing/index.html (inside the writing folder) → serves at rker.me/writing/
-index.html is just the reserved filename meaning "the default page for this folder." One per folder. So the root's index is your homepage, and writing's index is the writing landing page listing the posts.
-
-It's the same pattern that gives you the clean URLs: cv.html → /cv, and writing/the-integration-tax.html → /writing/the-integration-tax. I could have named it writing.html instead and gotten /writing, but the folder version keeps the posts grouped tidily alongside their index rather than scattered at the root.
-
-The thing to watch when committing: the second one must go into a writing/ folder, not the root — otherwise it'll overwrite your homepage. In the GitHub web UI the trick is Add file → Create new file, then type writing/index.html as the filename. Typing the slash automatically creates the folder. Same for the three posts: writing/the-integration-tax.html, and so on.
-
-So your repo ends up looking like:
-
-index.html          ← homepage
-cv.html
-colophon.html
-site.css
-writing/
-  index.html        ← writing landing page
-  the-integration-tax.html
-  front-desk-data.html
-  buying-a-pms.html
-Since the download probably gave you both files with similar names, just be deliberate about which is which — the writing one is the shorter file with the post list in it.
-
-how to i craete a folder in github web interface?
-
-There's no "New folder" button — GitHub creates folders implicitly when you type a path with a slash in it. Here's the trick:
-
-1. In your repo, click Add file → Create new file.
-
-2. In the filename box at the top, type:
-
-writing/index.html
-The moment you type the /, GitHub turns "writing" into a folder breadcrumb and the cursor moves into the next segment. That's your folder created.
-
-3. Paste the contents of the writing index page into the editor below.
-
-4. Scroll down, add a commit message, click Commit changes.
-
-Done — the writing/ folder now exists with index.html inside it.
-
-For the other three posts, the folder's already there, so it's easier: navigate into the writing folder first, then Add file → Create new file, and just type the filename (the-integration-tax.html) — no path prefix needed. Or keep using the full path from the root; both work.
-
-Two things worth knowing:
-
-Git doesn't track empty folders. You can't create writing/ on its own — it only exists because a file lives in it. That's why the folder and the first file get made in one step.
-If you backspace past the slash, GitHub collapses the folder again. Slightly disorienting the first time, but it's just the breadcrumb reacting to your typing.
-One caution while you're pasting: use Create new file for writing/index.html, not the drag-and-drop upload — the upload flow puts files wherever you're currently browsing, which is how people accidentally overwrite their root index.html.
-
-
-
-
-
-
-
-Claude is AI and can make mistakes. Please double-check responses.
-
-
-Index · HTML
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
- 
+
 <!-- ============================================================
      rker.me — personal home page.
      Things you'll want to edit are marked  EDIT ME  below.
@@ -215,26 +11,26 @@ Index · HTML
      is the entry point). Every asset here is optional except
      index.html — the page renders fine on its own.
      ============================================================ -->
- 
+
 <!-- ---------- Core SEO ---------- -->
 <title>Parker — home on the internet</title>
 <meta name="description" content="Gold Coast–based hospitality &amp; tourism systems specialist — PMS, RMS, BI, POS, web and integrations, with 20 years' experience. Say hello at p@rker.me.">
 <meta name="author" content="Scott Parker">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://rker.me/">
- 
+
 <!-- ---------- Appearance ---------- -->
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
- 
+
 <!-- ---------- Icons ---------- -->
 <!-- Inline SVG icon keeps the page self-sufficient; the .svg file is a fallback. -->
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNyIgZmlsbD0iIzRCM0JGRiIvPjx0ZXh0IHg9IjE2IiB5PSIyMyIgZm9udC1mYW1pbHk9InN5c3RlbS11aSwtYXBwbGUtc3lzdGVtLFNlZ29lIFVJLFJvYm90byxzYW5zLXNlcmlmIiBmb250LXNpemU9IjIyIiBmb250LXdlaWdodD0iNzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjRkJGQUY3Ij5APC90ZXh0Pjwvc3ZnPg==" type="image/svg+xml">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
- 
+
 <!-- ---------- Open Graph (Facebook, LinkedIn, iMessage, Slack…) ---------- -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="rker.me">
@@ -246,14 +42,14 @@ Index · HTML
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="The wordmark P@rker, where the @ forms the A.">
 <meta property="og:locale" content="en_AU">
- 
+
 <!-- ---------- Twitter / X ---------- -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Parker — home on the internet">
 <meta name="twitter:description" content="Gold Coast–based hospitality systems specialist — PMS, RMS, BI, POS, web and integrations. 20 years in tourism.">
 <meta name="twitter:image" content="https://rker.me/og.png">
 <meta name="twitter:image:alt" content="The wordmark P@rker, where the @ forms the A.">
- 
+
 <!-- ---------- Structured data: this is what search + AI crawlers parse ---------- -->
 <!-- EDIT ME: name is set to your real name for search — change to "Parker" if you'd rather stay first-name-less. -->
 <script type="application/ld+json">
@@ -289,12 +85,12 @@ Index · HTML
   ]
 }
 </script>
- 
+
 <!-- ---------- Fonts ---------- -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
- 
+
 <style>
   :root {
     color-scheme: light dark;
@@ -313,10 +109,10 @@ Index · HTML
       --accent: #8674FF;
     }
   }
- 
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; }
- 
+
   body {
     background: var(--paper);
     color: var(--ink);
@@ -330,7 +126,7 @@ Index · HTML
     text-align: center;
     -webkit-font-smoothing: antialiased;
   }
- 
+
   .flags {
     display: flex;
     justify-content: center;
@@ -349,14 +145,14 @@ Index · HTML
   @media (prefers-color-scheme: dark) {
     .flags img { box-shadow: 0 0 0 1px rgba(255,255,255,0.14); }
   }
- 
+
   h1.name {
     display: flex;
     justify-content: center;
     font-weight: 700;
     line-height: 0.9;
   }
- 
+
   .wordmark {
     font-family: inherit;
     font-weight: 700;
@@ -376,7 +172,7 @@ Index · HTML
     outline: 3px solid var(--accent);
     outline-offset: 0.1em;
   }
- 
+
   .at {
     color: var(--accent);
     display: inline-block;
@@ -386,7 +182,7 @@ Index · HTML
   }
   .wordmark:hover .at,
   .wordmark:focus-visible .at { transform: rotate(360deg); }
- 
+
   .hint {
     font-family: "Space Mono", monospace;
     font-size: 0.75rem;
@@ -398,7 +194,7 @@ Index · HTML
     transition: color 0.2s ease;
   }
   .hint.copied { color: var(--accent); }
- 
+
   .tagline {
     max-width: 42ch;
     margin-inline: auto;
@@ -409,7 +205,7 @@ Index · HTML
     opacity: 0;
     animation: rise 0.8s ease-out 0.55s forwards;
   }
- 
+
   .links {
     display: flex;
     flex-wrap: wrap;
@@ -440,7 +236,7 @@ Index · HTML
   .links a:hover::after,
   .links a:focus-visible::after { transform: scaleX(1); }
   .links a:focus-visible { outline: none; color: var(--accent); }
- 
+
   footer {
     position: fixed;
     bottom: 1.5rem;
@@ -456,7 +252,7 @@ Index · HTML
     animation: rise 0.8s ease-out 0.9s forwards;
   }
   footer .at-small { color: var(--accent); }
- 
+
   .pages {
     display: flex;
     gap: 1.3rem;
@@ -482,14 +278,14 @@ Index · HTML
   .pages a:hover::after,
   .pages a:focus-visible::after { transform: scaleX(1); }
   .pages a:focus-visible { outline: none; color: var(--accent); }
- 
+
   /* Keep the fixed footer from colliding with content on short screens */
   body { padding-bottom: 6rem; }
   @media (max-height: 600px) {
     footer { position: static; margin-top: 2.5rem; }
     body { padding-bottom: 2rem; }
   }
- 
+
   @keyframes rise {
     from { opacity: 0; transform: translateY(14px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -498,7 +294,7 @@ Index · HTML
     0%   { transform: rotate(-190deg) scale(0.4); }
     100% { transform: rotate(0deg) scale(1); }
   }
- 
+
   @media (prefers-reduced-motion: reduce) {
     *, .at { animation: none !important; transition: none !important; }
     .flags, .wordmark, .hint, .tagline, .links, footer { opacity: 1; transform: none; }
@@ -512,25 +308,25 @@ Index · HTML
       <img src="/gb.svg" width="32" height="24" alt="United Kingdom" loading="lazy" decoding="async">
       <img src="/au.svg" width="32" height="24" alt="Australia" loading="lazy" decoding="async">
     </div>
- 
+
     <!-- The name is the page's h1; the button inside copies your email on click. -->
     <h1 class="name">
       <button class="wordmark" id="mark" aria-label="Copy email address p@rker.me">P<span class="at">@</span>rker</button>
     </h1>
- 
+
     <!-- Live region: screen readers announce the "copied" confirmation. -->
     <p class="hint" id="hint" role="status" aria-live="polite">click my name to copy the email</p>
- 
+
     <!-- EDIT ME: your one-liner -->
     <p class="tagline">Gold Coast–based, with twenty years in hospitality and tourism. Full-stack systems specialist — PMS, RMS, BI, POS, web and the integrations that tie them together.</p>
- 
+
     <!-- EDIT ME: your links. Delete any you don't want. -->
     <nav class="links" aria-label="Elsewhere">
       <a href="mailto:p@rker.me">email</a>
       <a href="https://www.linkedin.com/in/scott-p-7385b52a/" target="_blank" rel="noopener me">linkedin</a>
     </nav>
   </main>
- 
+
   <footer>
     <nav class="pages" aria-label="Pages">
       <a href="/cv">cv</a>
@@ -539,14 +335,14 @@ Index · HTML
     </nav>
     <span class="mark-line">p<span class="at-small">@</span>rker.me</span>
   </footer>
- 
+
 <script>
   const EMAIL = "p@rker.me";   // EDIT ME if your address differs
   const mark = document.getElementById("mark");
   const hint = document.getElementById("hint");
   const DEFAULT_HINT = "click my name to copy the email";
   let resetTimer;
- 
+
   mark.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(EMAIL);
@@ -564,4 +360,3 @@ Index · HTML
 </script>
 </body>
 </html>
- 
