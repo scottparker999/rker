@@ -18,6 +18,7 @@
 - [What operators get wrong when buying a PMS](https://rker.me/writing/buying-a-pms): data model and data access matter more than the feature matrix
 
 ## Tools
+- [OTA vs direct true cost calculator](https://rker.me/tools/ota-vs-direct): what an OTA booking really costs once commission, Genius and member discounts, Preferred Partner uplift, sponsored ads, virtual card fees and cancellations are counted, plus the breakeven direct rate
 - [Group displacement calculator](https://rker.me/tools/group-displacement): whether a group booking contributes more than the transient business it displaces — per-night displacement, contribution after commission and variable cost, and breakeven group rate
 
 ## Contact
