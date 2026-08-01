@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<!-- ============================================================
+     rker.me — personal home page.
+     Things you'll want to edit are marked  EDIT ME  below.
+     Deploy: upload this folder to Cloudflare Pages (index.html
+     is the entry point). Every asset here is optional except
+     index.html — the page renders fine on its own.
+     ============================================================ -->
 
 <!-- ---------- Core SEO ---------- -->
 <title>Parker — home on the internet</title>
@@ -120,15 +127,23 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  .eyebrow {
-    font-family: "Space Mono", monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.28em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 1.75rem;
+  .flags {
+    display: flex;
+    justify-content: center;
+    gap: 0.6rem;
+    margin-bottom: 1.9rem;
     opacity: 0;
-    animation: rise 0.7s ease-out 0.1s forwards;
+    animation: rise 0.7s ease-out 0.05s forwards;
+  }
+  .flags img {
+    width: 32px;
+    height: 24px;
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
+    display: block;
+  }
+  @media (prefers-color-scheme: dark) {
+    .flags img { box-shadow: 0 0 0 1px rgba(255,255,255,0.14); }
   }
 
   h1.name {
@@ -245,14 +260,17 @@
 
   @media (prefers-reduced-motion: reduce) {
     *, .at { animation: none !important; transition: none !important; }
-    .eyebrow, .wordmark, .hint, .tagline, .links, footer { opacity: 1; transform: none; }
+    .flags, .wordmark, .hint, .tagline, .links, footer { opacity: 1; transform: none; }
   }
 </style>
 </head>
 <body>
   <main>
-    <!-- EDIT ME: the little line above your name -->
-    <p class="eyebrow">home on the internet</p>
+    <!-- Dual citizenship as the eyebrow. Order/size tweakable. -->
+    <div class="flags">
+      <img src="/gb.svg" width="32" height="24" alt="United Kingdom" loading="lazy" decoding="async">
+      <img src="/au.svg" width="32" height="24" alt="Australia" loading="lazy" decoding="async">
+    </div>
 
     <!-- The name is the page's h1; the button inside copies your email on click. -->
     <h1 class="name">
