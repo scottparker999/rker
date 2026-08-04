@@ -13,6 +13,8 @@ import {
   blendedMinutes,
   costOccupancyInversion,
   evaluateDay,
+  lateCheckoutVerdict,
+  parseTime,
   penaltyMultiplier,
   serviceFactor,
   verdict,
@@ -324,6 +326,186 @@ test('a departure-dominated week is identified as such', () => {
     days: [{ date: '2026-03-03', occupied: 100, arrivals: 80, departures: 80 }],
   });
   assert.equal(verdict(result.totals, result.threshold), 'departure-driven');
+});
+
+/* ---------- fixed and variable ---------- */
+
+test('fixed work is separated from the work rooms create', () => {
+  const d = evaluateDay(
+    { occupied: 100, arrivals: 12, departures: 12 },
+    { ...globals, fixedDailyMinutes: 120 },
+    blended,
+  );
+  // 12 x 45 + 88 x 15 = 1860 room work, plus 120 fixed
+  close(d.fixedMinutes, 120);
+  close(d.totalMinutes, 1980);
+  close(d.fixedShare, 120 / 1980);
+  close(d.variableShare, 1860 / 1980);
+});
+
+test('spare capacity inside a rostered shift is reported', () => {
+  // 31 productive hours -> 4 staff on 8s = 32 paid, 1 hour spare
+  const d = evaluateDay({ occupied: 100, arrivals: 12, departures: 12 }, globals, blended);
+  close(d.spareProductiveMinutes, 60); // 1 slack hour at 100% productivity
+  assert.equal(d.absorbsAnotherClean, true, '45 minutes of clean fits in 60 spare');
+});
+
+/* ---------- late checkout ---------- */
+
+const lateGlobals = {
+  ...globals,
+  shiftStart: '08:00',
+  shiftHours: 8,
+  lateCheckoutTime: '14:00',
+  overtimeMultiplier: 1.5,
+  lateCheckoutPrice: 0,
+  ancillaryPerLateCheckout: 28,
+};
+
+test('times parse, and rubbish does not', () => {
+  close(parseTime('14:30'), 14.5);
+  close(parseTime('08:00'), 8);
+  assert.equal(parseTime('25:00'), null);
+  assert.equal(parseTime('nonsense'), null);
+  assert.equal(parseTime(null), null);
+});
+
+test('a late checkout inside capacity costs nothing extra', () => {
+  const d = evaluateDay(
+    { date: '2026-03-04', occupied: 100, arrivals: 12, departures: 12, lateCheckouts: 2 },
+    lateGlobals,
+    blended,
+  );
+  const l = d.lateCheckout;
+  assert.ok(l.absorbable >= 2, 'the day can absorb them');
+  assert.equal(l.beyondCapacity, 0);
+  assert.equal(l.overtimeCost, 0);
+  // pure upside: whatever the guest spends, with no labour against it
+  close(l.netValue, 2 * 28);
+});
+
+test('past capacity a late checkout runs into overtime', () => {
+  const d = evaluateDay(
+    { date: '2026-03-04', occupied: 100, arrivals: 12, departures: 12, lateCheckouts: 40 },
+    lateGlobals,
+    blended,
+  );
+  const l = d.lateCheckout;
+  assert.ok(l.beyondCapacity > 0, 'more granted than the window can take');
+  assert.ok(l.overtimeCost > 0);
+  // 28 of spend against a 45 minute clean at time and a half is a losing trade
+  assert.equal(l.worthwhileBeyondCapacity, false);
+  assert.ok(l.netValue < l.grossValue);
+});
+
+test('the marginal cost of a late checkout rises with penalty rates', () => {
+  const midweek = evaluateDay(
+    { date: '2026-03-04', occupied: 100, arrivals: 12, departures: 12, lateCheckouts: 1 },
+    lateGlobals,
+    blended,
+  );
+  const sunday = evaluateDay(
+    { date: '2026-03-08', occupied: 100, arrivals: 12, departures: 12, lateCheckouts: 1 },
+    lateGlobals,
+    blended,
+  );
+  close(sunday.lateCheckout.marginalCostPerLate, midweek.lateCheckout.marginalCostPerLate * 1.5);
+});
+
+test('charging for it flips the days that were not worth giving away', () => {
+  const day = { date: '2026-03-08', occupied: 100, arrivals: 12, departures: 12, lateCheckouts: 40 };
+  const free = evaluateDay(day, lateGlobals, blended);
+  const charged = evaluateDay(day, { ...lateGlobals, lateCheckoutPrice: 60 }, blended);
+
+  assert.equal(free.lateCheckout.worthwhileBeyondCapacity, false);
+  assert.equal(charged.lateCheckout.worthwhileBeyondCapacity, true);
+  // and the free version caps the give-away, the charged one does not
+  assert.equal(free.lateCheckout.grantUpTo, free.lateCheckout.absorbable);
+  assert.equal(charged.lateCheckout.grantUpTo, null);
+});
+
+test('a later checkout time leaves less room to absorb it', () => {
+  // A light day, so the normal work finishes before the late window and the
+  // window itself is what binds.
+  const day = { date: '2026-03-04', occupied: 30, arrivals: 3, departures: 3, lateCheckouts: 0 };
+  const two = evaluateDay(day, lateGlobals, blended);
+  const halfFour = evaluateDay(day, { ...lateGlobals, lateCheckoutTime: '15:30' }, blended);
+  assert.ok(halfFour.lateCheckout.lateWindowHours < two.lateCheckout.lateWindowHours);
+  assert.ok(halfFour.lateCheckout.absorbable < two.lateCheckout.absorbable);
+});
+
+test('once normal work overruns, total spare capacity binds rather than the window', () => {
+  // A heavy day cannot finish before the late window, so everything left is
+  // at the back of the shift anyway and moving the checkout time changes
+  // nothing. Worth pinning down: it is the behaviour, not an oversight.
+  const day = { date: '2026-03-04', occupied: 100, arrivals: 12, departures: 12, lateCheckouts: 0 };
+  const two = evaluateDay(day, lateGlobals, blended);
+  const halfFour = evaluateDay(day, { ...lateGlobals, lateCheckoutTime: '15:30' }, blended);
+  assert.equal(two.lateCheckout.absorbable, halfFour.lateCheckout.absorbable);
+  // and that shared figure is the day's total spare productive capacity
+  close(two.lateCheckout.availableForLate, two.spareProductiveMinutes);
+});
+
+test('a checkout time past the end of the shift absorbs nothing', () => {
+  const d = evaluateDay(
+    { date: '2026-03-04', occupied: 100, arrivals: 12, departures: 12, lateCheckouts: 2 },
+    { ...lateGlobals, lateCheckoutTime: '18:00' },
+    blended,
+  );
+  close(d.lateCheckout.lateWindowHours, 0);
+  assert.equal(d.lateCheckout.absorbable, 0);
+  assert.equal(d.lateCheckout.beyondCapacity, 2);
+});
+
+test('unsold capacity across the period is surfaced', () => {
+  const result = analyse({
+    ...lateGlobals,
+    unitTypes: oneType,
+    days: [
+      { date: '2026-03-03', occupied: 100, arrivals: 12, departures: 12, lateCheckouts: 0 },
+      { date: '2026-03-04', occupied: 100, arrivals: 12, departures: 12, lateCheckouts: 0 },
+    ],
+  });
+  assert.ok(result.totals.lateAbsorbable > 0);
+  assert.equal(result.totals.lateGranted, 0);
+  assert.equal(result.totals.lateUnusedCapacity, result.totals.lateAbsorbable);
+  assert.equal(lateCheckoutVerdict(result.totals), 'giving-nothing');
+});
+
+test('granting past capacity at a loss is called out', () => {
+  const result = analyse({
+    ...lateGlobals,
+    unitTypes: oneType,
+    days: [{ date: '2026-03-08', occupied: 100, arrivals: 12, departures: 12, lateCheckouts: 60 }],
+  });
+  assert.ok(result.totals.lateBeyondCapacity > 0);
+  assert.ok(result.totals.lateNetValue < 0);
+  assert.equal(lateCheckoutVerdict(result.totals), 'overcommitted');
+});
+
+test('late checkout totals aggregate across the period', () => {
+  const result = analyse({
+    ...lateGlobals,
+    unitTypes: oneType,
+    days: [
+      { date: '2026-03-03', occupied: 100, arrivals: 12, departures: 12, lateCheckouts: 3 },
+      { date: '2026-03-04', occupied: 100, arrivals: 12, departures: 12, lateCheckouts: 2 },
+    ],
+  });
+  assert.equal(result.totals.lateGranted, 5);
+  close(result.totals.lateGrossValue, 5 * 28);
+  close(result.totals.lateNetValue, 5 * 28); // all inside capacity
+  assert.equal(lateCheckoutVerdict(result.totals), 'underused');
+});
+
+test('late checkout figures stay finite on junk input', () => {
+  const d = evaluateDay(
+    { date: 'x', occupied: 'a', arrivals: null, departures: undefined, lateCheckouts: 'zzz' },
+    { ...lateGlobals, shiftStart: 'nope', lateCheckoutTime: '' },
+    blended,
+  );
+  const nums = Object.values(d.lateCheckout).filter((v) => typeof v === 'number');
+  assert.ok(nums.every(Number.isFinite), 'every late checkout figure should be finite');
 });
 
 /* ---------- robustness ---------- */
