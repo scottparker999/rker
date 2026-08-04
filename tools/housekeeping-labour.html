@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Housekeeping labour model — rker.me</title>
-<meta name="description" content="Housekeeping cost tracks departures, not occupancy. Model required hours, staffing and cost per occupied room from your arrival and departure pattern — and price what a shift in length of stay is actually worth. Runs entirely in your browser.">
+<title>Housekeeping cost and late checkout model — rker.me</title>
+<meta name="description" content="Most of a housekeeping day is committed the moment the roster is published. Work out what is fixed, what is genuinely variable, and how many late checkouts you can give away before one costs you a shift. Runs entirely in your browser.">
 <link rel="canonical" href="https://rker.me/tools/housekeeping-labour">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
@@ -13,8 +13,8 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
 <meta property="og:type" content="website">
-<meta property="og:title" content="Housekeeping labour model">
-<meta property="og:description" content="Your roster is built on occupancy. The work is created by departures.">
+<meta property="og:title" content="Housekeeping cost and late checkout model">
+<meta property="og:description" content="A late checkout costs nothing until it costs a whole shift. Find the line.">
 <meta property="og:url" content="https://rker.me/tools/housekeeping-labour">
 <meta property="og:image" content="https://rker.me/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -40,11 +40,11 @@
 
   <main>
     <p class="eyebrow reveal">Tool</p>
-    <h1 class="reveal">Housekeeping runs on departures.</h1>
+    <h1 class="reveal">What a late checkout really costs.</h1>
     <p class="lede reveal narrow">
-      Occupancy tells you how many rooms are full. It tells you nothing about how many changed
-      hands, and changing hands is the work. This models the roster off the number that actually
-      creates it.
+      Most of a housekeeping day is committed the moment the roster is published. This works out
+      what is genuinely fixed, what is variable, and how many late checkouts you can hand out before
+      one of them costs you a shift.
     </p>
 
     <noscript>
@@ -143,6 +143,43 @@
               <span>Sunday loading</span>
               <input type="number" id="sundayMultiplier" value="1.5" min="1" step="0.05" inputmode="decimal">
             </label>
+            <label>
+              <span>Shift starts</span>
+              <input type="time" id="shiftStart" value="08:00">
+            </label>
+            <label>
+              <span>Overtime loading</span>
+              <input type="number" id="overtimeMultiplier" value="1.5" min="1" step="0.05" inputmode="decimal">
+              <small>Applied on top of the day's rate.</small>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal">
+        <h2>Late checkout</h2>
+        <div>
+          <p>
+            A late checkout doesn't create extra work — it's the same clean, pushed into a narrower
+            window. So it costs nothing while the rostered shift can still absorb it, and a real
+            amount the moment it can't. Against that sits whatever the guest spends by still being
+            on the property at lunchtime.
+          </p>
+          <div class="field-grid">
+            <label>
+              <span>Late checkout offered at</span>
+              <input type="time" id="lateCheckoutTime" value="14:00">
+            </label>
+            <label>
+              <span>Price charged</span>
+              <input type="number" id="lateCheckoutPrice" value="0" min="0" step="0.01" inputmode="decimal">
+              <small>Zero if you give it away.</small>
+            </label>
+            <label>
+              <span>Spend per late guest</span>
+              <input type="number" id="ancillaryPerLateCheckout" value="28" min="0" step="0.01" inputmode="decimal">
+              <small>Contribution, not revenue — lunch, bar, shop.</small>
+            </label>
           </div>
         </div>
       </section>
@@ -165,6 +202,7 @@
                   <th scope="col">Occupied tonight</th>
                   <th scope="col">Arrivals</th>
                   <th scope="col">Departures</th>
+                  <th scope="col">Late checkouts</th>
                   <th scope="col">Loading override</th>
                   <th scope="col"><span class="sr-only">Remove</span></th>
                 </tr>
@@ -221,6 +259,37 @@
     </section>
 
     <section class="section reveal">
+      <h2>The late checkout call</h2>
+      <div>
+        <div class="verdict" id="lateVerdict">
+          <p class="verdict-call" id="lateCall">—</p>
+          <p class="verdict-net" id="lateNet"></p>
+          <p class="verdict-why" id="lateWhy"></p>
+        </div>
+        <dl class="figures" id="lateFigures"></dl>
+
+        <div class="table-scroll">
+          <table class="grid results">
+            <caption>What you can absorb, day by day</caption>
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Dep</th>
+                <th scope="col">Free up to</th>
+                <th scope="col">Granted</th>
+                <th scope="col">Beyond</th>
+                <th scope="col">Then each costs</th>
+                <th scope="col">Each returns</th>
+                <th scope="col">Net</th>
+              </tr>
+            </thead>
+            <tbody id="lateRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section reveal">
       <h2>Length of stay</h2>
       <div>
         <p>
@@ -244,11 +313,19 @@
       <h2>Method</h2>
       <div>
         <p>
-          <strong>Departures create the work, not occupancy.</strong> A checkout clean is typically
-          two to three times a stayover service — the room is stripped, the bathroom is done
-          properly, and it has to be inspected. Two days at identical occupancy can differ by half
-          again in labour purely on how many rooms changed hands, which is why a roster built off an
-          occupancy forecast is built off the wrong number.
+          <strong>Most of a housekeeping day is fixed before it starts.</strong> Shifts are
+          committed in advance, and once they are, the marginal cost of one more clean inside them
+          is nothing — you have already bought the hours. The cost only appears when the work
+          crosses a shift boundary, and then it arrives all at once. Housekeeping is a step
+          function, not a slope, which is why asking "what does a clean cost" gives you an average
+          that is wrong in both directions.
+        </p>
+        <p>
+          <strong>A late checkout is the same work in a narrower window.</strong> It does not add
+          minutes; it delays them. So it is free while the rostered shift can still take it, and
+          costs real overtime the moment it cannot — and that threshold moves every day with the
+          departure count and the staffing. On a day the normal work already runs past the late
+          checkout time there is nothing left to give; on a quiet day there is a surprising amount.
         </p>
         <p>
           <strong>Stayovers are derived, never entered.</strong> Rooms occupied tonight less
@@ -276,7 +353,8 @@
           so.
         </p>
         <p>
-          The argument behind this, and why the roster is where it shows up, is in
+          The argument behind this — why the cheapest thing on your rate card is the one you
+          give away without pricing — is in
           <a class="u" href="/writing/the-cost-of-a-checkout">The cost of a checkout</a>.
         </p>
         <p>
@@ -284,7 +362,10 @@
           which are a real cost but not a labour one; maintenance and turndown; supervision,
           inspection and training overhead; the quality cost of rushing a clean to hit a departure
           board; and room-readiness timing against arrival time, which is a sequencing problem
-          rather than a volume one. In-house against contract cleaning is a genuine decision with a
+          rather than a volume one. On the late checkout side it assumes the room is not needed for an
+          arriving guest — on a sold-out night that is the binding constraint rather than labour,
+          and it is a different calculation. Nor does it model the goodwill of saying yes, which is
+          real and unquantifiable. In-house against contract cleaning is a genuine decision with a
           genuine threshold, and it deserves its own tool rather than a mode bolted onto this one.
         </p>
         <p class="fineprint">
@@ -307,13 +388,15 @@
 </div>
 
 <script type="module">
-  import { analyse, alosScenario, verdict, SERVICE_FREQUENCIES } from '/tools/housekeeping.js';
+  import { analyse, alosScenario, verdict, lateCheckoutVerdict, SERVICE_FREQUENCIES } from '/tools/housekeeping.js';
 
   const $ = (id) => document.getElementById(id);
 
   const GLOBAL_IDS = [
     'optOutPct', 'fixedDailyMinutes', 'productivityPct', 'shiftHours',
     'baseHourlyRate', 'oncostPct', 'saturdayMultiplier', 'sundayMultiplier',
+    'shiftStart', 'lateCheckoutTime', 'overtimeMultiplier',
+    'lateCheckoutPrice', 'ancillaryPerLateCheckout',
   ];
 
   const UNIT_COLUMNS = [
@@ -328,6 +411,7 @@
     { key: 'occupied', type: 'number', label: 'Occupied tonight', step: 1 },
     { key: 'arrivals', type: 'number', label: 'Arrivals', step: 1 },
     { key: 'departures', type: 'number', label: 'Departures', step: 1 },
+    { key: 'lateCheckouts', type: 'number', label: 'Late checkouts granted', step: 1 },
     { key: 'penaltyOverride', type: 'number', label: 'Loading override', step: 0.05 },
   ];
 
@@ -339,13 +423,13 @@
     { name: 'Powered site', sharePct: 55, departureMinutes: 12, stayoverMinutes: 0 },
   ];
   const SEED_DAYS = [
-    { date: '2026-03-02', occupied: 82, arrivals: 12, departures: 18, penaltyOverride: '' },
-    { date: '2026-03-03', occupied: 82, arrivals: 30, departures: 30, penaltyOverride: '' },
-    { date: '2026-03-04', occupied: 76, arrivals: 14, departures: 20, penaltyOverride: '' },
-    { date: '2026-03-05', occupied: 84, arrivals: 24, departures: 16, penaltyOverride: '' },
-    { date: '2026-03-06', occupied: 110, arrivals: 38, departures: 12, penaltyOverride: '' },
-    { date: '2026-03-07', occupied: 116, arrivals: 50, departures: 44, penaltyOverride: '' },
-    { date: '2026-03-08', occupied: 70, arrivals: 12, departures: 58, penaltyOverride: '' },
+    { date: '2026-03-02', occupied: 82, arrivals: 12, departures: 18, lateCheckouts: 4, penaltyOverride: '' },
+    { date: '2026-03-03', occupied: 82, arrivals: 30, departures: 30, lateCheckouts: 6, penaltyOverride: '' },
+    { date: '2026-03-04', occupied: 76, arrivals: 14, departures: 20, lateCheckouts: 4, penaltyOverride: '' },
+    { date: '2026-03-05', occupied: 84, arrivals: 24, departures: 16, lateCheckouts: 3, penaltyOverride: '' },
+    { date: '2026-03-06', occupied: 110, arrivals: 38, departures: 12, lateCheckouts: 3, penaltyOverride: '' },
+    { date: '2026-03-07', occupied: 116, arrivals: 50, departures: 44, lateCheckouts: 12, penaltyOverride: '' },
+    { date: '2026-03-08', occupied: 70, arrivals: 12, departures: 58, lateCheckouts: 16, penaltyOverride: '' },
   ];
 
   const n0 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
@@ -445,27 +529,14 @@
       $('verdictWhy').textContent = 'Enter at least one day to model the roster.';
     } else {
       const call = verdict(t, result.threshold);
-      const inv = result.inversion;
-      v.dataset.call = call === 'departure-driven' ? 'decline' : call === 'inverted' ? 'marginal' : 'accept';
-
-      if (inv && inv.quietestIsDearest) {
-        $('verdictCall').textContent = 'Your quietest day is your dearest day';
-        $('verdictNet').textContent =
-          `${weekday(inv.quietest.date)} ${inv.quietest.date} — ${n0.format(inv.quietest.occupied)} occupied, ${money.format(inv.quietest.cost)}`;
-        $('verdictWhy').textContent =
-          `${weekday(inv.busiest.date)} was the busiest night of the week at ${n0.format(inv.busiest.occupied)} occupied and cost ${money.format(inv.busiest.cost)}. Occupancy did not create the work — ${n0.format(inv.quietest.departures)} departures did.`;
-      } else if (inv && inv.inverted) {
-        $('verdictCall').textContent = 'The busiest day is not the dearest day';
-        $('verdictNet').textContent =
-          `Dearest was ${weekday(inv.dearest.date)} at ${money.format(inv.dearest.cost)}, on ${n0.format(inv.dearest.occupied)} occupied`;
-        $('verdictWhy').textContent =
-          `The busiest night was ${weekday(inv.busiest.date)} at ${n0.format(inv.busiest.occupied)} occupied, costing ${money.format(inv.busiest.cost)}. Departures, not occupancy, set the roster.`;
-      } else {
-        $('verdictCall').textContent = `${pctFmt.format(t.departureShare)} of the work is turnover`;
-        $('verdictNet').textContent = `${money2.format(t.costPerOccupiedRoom)} per occupied room night`;
-        $('verdictWhy').textContent =
-          'Departure cleans are the larger share of the workload, so the roster should follow the departure forecast.';
-      }
+      v.dataset.call = call === 'inverted' ? 'marginal' : 'accept';
+      $('verdictCall').textContent = `${money.format(t.cost)} committed for the period`;
+      $('verdictNet').textContent =
+        `${n1.format(t.paidHours)} paid hours, of which ${n1.format(t.slackHours)} have no work in them`;
+      $('verdictWhy').textContent =
+        'Once the roster is published this is spent whatever the week does. The next clean costs '
+        + 'nothing while there are spare hours inside it, and an entire shift the moment there '
+        + `aren't — ${pctFmt.format(t.fixedShare)} of the work does not depend on rooms turning at all.`;
     }
 
     // --- matched pair + figures ----------------------------------------
@@ -482,6 +553,8 @@
         `${n1.format(t.paidHours)} paid hours at ${money2.format(t.blendedHourlyCost)} blended`);
       figure(dl, 'Cost per occupied room night', money2.format(t.costPerOccupiedRoom),
         `${n0.format(t.roomNights)} room nights`);
+      figure(dl, 'Fixed regardless of turnover', pctFmt.format(t.fixedShare),
+        'Public areas, linen and laundry — there whether or not a room changes hands');
       figure(dl, 'Work created by turnover', pctFmt.format(t.departureShare),
         `${n0.format(t.departures)} departures against ${n0.format(t.stayovers)} stayovers`);
       figure(dl, 'Rostering slack', `${n1.format(t.slackHours)} hrs`,
@@ -523,6 +596,85 @@
       td.textContent = 'Add a day to see the roster.';
       tr.appendChild(td);
       body.appendChild(tr);
+    }
+
+    // --- the late checkout call ----------------------------------------
+    const lv = $('lateVerdict');
+    const ldl = $('lateFigures');
+    ldl.replaceChildren();
+    const lbody = $('lateRows');
+    lbody.replaceChildren();
+
+    if (t) {
+      const call = lateCheckoutVerdict(t);
+      lv.dataset.call = call === 'overcommitted' ? 'decline'
+        : call === 'balanced' ? 'accept' : 'marginal';
+
+      const CALLS = {
+        'giving-nothing': [
+          'You are selling none of it',
+          `${n0.format(t.lateAbsorbable)} late checkouts fit in the roster you are already paying for`,
+          'Every one of those costs nothing in labour. Whatever a guest spends staying until lunchtime is the whole of it.',
+        ],
+        underused: [
+          'There is more room than you are using',
+          `${n0.format(t.lateUnusedCapacity)} more would cost nothing`,
+          'The shifts are rostered and paid for either way. Unsold capacity here is not a saving, it is just unsold.',
+        ],
+        overcommitted: [
+          'You are giving away more than you can absorb',
+          `${n0.format(t.lateBeyondCapacity)} beyond capacity, costing ${money.format(t.lateOvertimeCost)} in overtime`,
+          'Past the free allowance each one runs into overtime that the spend does not cover. Price it or cap it on those days.',
+        ],
+        balanced: [
+          'Close to the line',
+          `${money.format(t.lateNetValue)} net across the period`,
+          'The free capacity is broadly used up without spilling into overtime.',
+        ],
+      };
+      const [head, net, why] = CALLS[call] || CALLS.balanced;
+      $('lateCall').textContent = head;
+      $('lateNet').textContent = net;
+      $('lateWhy').textContent = why;
+
+      figure(ldl, 'Free capacity in the week', n0.format(t.lateAbsorbable),
+        'Late checkouts the rostered shifts can absorb at no extra labour cost');
+      figure(ldl, 'Currently granted', n0.format(t.lateGranted),
+        t.lateBeyondCapacity > 0
+          ? `${n0.format(t.lateBeyondCapacity)} of them beyond what the roster can take`
+          : 'All within capacity');
+      figure(ldl, 'Worth as it stands', money.format(t.lateNetValue),
+        `${money.format(t.lateGrossValue)} of value less ${money.format(t.lateOvertimeCost)} of overtime`);
+      figure(ldl, 'Left on the table', money.format(t.lateUnusedCapacity * (result.days[0] ? result.days[0].lateCheckout.valuePerLate : 0)),
+        `${n0.format(t.lateUnusedCapacity)} unsold slots that would cost nothing to fill`);
+
+      for (const d of result.days) {
+        const l = d.lateCheckout;
+        const tr = document.createElement('tr');
+        if (l.beyondCapacity > 0) tr.className = 'over';
+        const cells = [
+          `${weekday(d.date)} ${d.date}`.trim() || '—',
+          n0.format(d.departures),
+          n0.format(l.absorbable),
+          n0.format(l.granted),
+          l.beyondCapacity > 0 ? n0.format(l.beyondCapacity) : '—',
+          money2.format(l.marginalCostPerLate),
+          money2.format(l.valuePerLate),
+          money.format(l.netValue),
+        ];
+        cells.forEach((text, i) => {
+          const td = document.createElement('td');
+          td.textContent = text;
+          if (i === 4 && l.beyondCapacity > 0) td.classList.add('flag');
+          tr.appendChild(td);
+        });
+        lbody.appendChild(tr);
+      }
+    } else {
+      lv.dataset.call = 'marginal';
+      $('lateCall').textContent = 'Add a day';
+      $('lateNet').textContent = '';
+      $('lateWhy').textContent = '';
     }
 
     // --- length of stay -------------------------------------------------
