@@ -5,3 +5,15 @@ wrangler.jsonc
 .gitignore
 README.md
 *.test.mjs
+
+# Unpublished for the moment. Delete these four lines to restore; the
+# pages, the nav links in index.html and the sitemap entries all come
+# back together.
+cv.html
+colophon.html
+writing/
+tools/
+
+# Stray duplicate of the home page from an old upload -- not linked from
+# anywhere, stale, and duplicate content for crawlers.
+mnt/
