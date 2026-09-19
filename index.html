@@ -143,6 +143,28 @@
   @media (prefers-color-scheme: dark) {
     .flags img { box-shadow: 0 0 0 1px rgba(255,255,255,0.14); }
   }
+  /* The flags are the easter egg: quietly clickable, never shouty. */
+  .flag {
+    background: none;
+    border: 0;
+    padding: 0;
+    line-height: 0;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+  .flag:hover { transform: translateY(-2px); }
+  .flag:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+  .flag[aria-pressed="true"] img { box-shadow: 0 0 0 2px var(--accent); }
+  /* A ring alone is hard to see against the flags' own colours, so the
+     one that is not chosen steps back. Only once a choice is made. */
+  .flags[data-active] .flag[aria-pressed="false"] { opacity: 0.4; }
+  .flag { transition: transform 0.2s ease, opacity 0.2s ease; }
+
+  /* Fade the copy as it swaps. Filter rather than opacity, because the
+     entrance animation fills forwards and would win over an opacity rule. */
+  .hint, .tagline { transition: filter 0.18s ease; }
+  .swapping { filter: opacity(0.25); }
 
   h1.name {
     display: flex;
@@ -186,7 +208,7 @@
     font-size: 0.75rem;
     color: var(--muted);
     margin-top: 0.6rem;
-    height: 1.2em;
+    min-height: 1.2em;
     opacity: 0;
     animation: rise 0.7s ease-out 0.45s forwards;
     transition: color 0.2s ease;
@@ -301,10 +323,17 @@
 </head>
 <body>
   <main>
-    <!-- Dual citizenship as the eyebrow. Order/size tweakable. -->
+    <!-- Dual citizenship as the eyebrow. Click one and the wording follows it home;
+         click it again to come back to neutral. -->
     <div class="flags">
-      <img src="/gb.svg" width="32" height="24" alt="United Kingdom" loading="lazy" decoding="async">
-      <img src="/au.svg" width="32" height="24" alt="Australia" loading="lazy" decoding="async">
+      <button class="flag" type="button" data-voice="gb" aria-pressed="false"
+              aria-label="United Kingdom — put the wording back in Lancashire">
+        <img src="/gb.svg" width="32" height="24" alt="" loading="lazy" decoding="async">
+      </button>
+      <button class="flag" type="button" data-voice="au" aria-pressed="false"
+              aria-label="Australia — put the wording in Australian">
+        <img src="/au.svg" width="32" height="24" alt="" loading="lazy" decoding="async">
+      </button>
     </div>
 
     <!-- The name is the page's h1; the button inside copies your email on click. -->
@@ -316,7 +345,7 @@
     <p class="hint" id="hint" role="status" aria-live="polite">click my name to copy the email</p>
 
     <!-- EDIT ME: your one-liner -->
-    <p class="tagline">Gold Coast–based, with twenty years in hospitality and tourism. Full-stack systems specialist — PMS, RMS, BI, POS, web and the integrations that tie them together.</p>
+    <p class="tagline" id="tagline">Gold Coast–based, with twenty years in hospitality and tourism. Full-stack systems specialist — PMS, RMS, BI, POS, web and the integrations that tie them together.</p>
 
     <!-- EDIT ME: your links. Delete any you don't want. -->
     <nav class="links" aria-label="Elsewhere">
@@ -339,20 +368,80 @@
   const EMAIL = "p@rker.me";   // EDIT ME if your address differs
   const mark = document.getElementById("mark");
   const hint = document.getElementById("hint");
-  const DEFAULT_HINT = "click my name to copy the email";
-  let resetTimer;
+  const tagline = document.getElementById("tagline");
+
+  /* EDIT ME: the flags are an easter egg. Click one and the page rewords
+     itself in that accent; click it again for plain English. Kept light on
+     purpose — a couple of word choices, no phonetic spelling. */
+  const VOICES = {
+    neutral: {
+      lang: "en",
+      hint: "click my name to copy the email",
+      copied: "copied  \u00b7  ",
+      tagline: "Gold Coast\u2013based, with twenty years in hospitality and tourism. "
+        + "Full-stack systems specialist \u2014 PMS, RMS, BI, POS, web and the integrations "
+        + "that tie them together.",
+    },
+    gb: {
+      lang: "en-GB",
+      hint: "give my name a click for the email",
+      copied: "there y'are  \u00b7  ",
+      tagline: "Blackburn born, Gold Coast these days. Twenty years in hospitality and "
+        + "tourism \u2014 PMS, RMS, BI, POS, web, and getting the lot to talk to each other. "
+        + "Nowt clever about it, it just works.",
+    },
+    au: {
+      lang: "en-AU",
+      hint: "click my name, that'll grab the email",
+      copied: "too easy  \u00b7  ",
+      tagline: "Gold Coast based, Blackburn originally. Twenty years in hospitality and "
+        + "tourism \u2014 PMS, RMS, BI, POS, web, and making the whole lot talk to each other. "
+        + "Reckon I can sort most of it.",
+    },
+  };
+
+  let voice = "neutral";
+  let resetTimer, swapTimer;
+
+  document.querySelectorAll(".flag").forEach((button) => {
+    button.addEventListener("click", () => {
+      // Clicking the flag that is already on takes you back to plain English.
+      voice = voice === button.dataset.voice ? "neutral" : button.dataset.voice;
+      const v = VOICES[voice];
+
+      const flags = document.querySelector(".flags");
+      document.querySelectorAll(".flag").forEach((b) => {
+        b.setAttribute("aria-pressed", String(b.dataset.voice === voice));
+      });
+      if (voice === "neutral") flags.removeAttribute("data-active");
+      else flags.setAttribute("data-active", voice);
+      document.documentElement.lang = v.lang;
+
+      clearTimeout(resetTimer);
+      clearTimeout(swapTimer);
+      hint.classList.add("swapping");
+      tagline.classList.add("swapping");
+      swapTimer = setTimeout(() => {
+        hint.textContent = v.hint;
+        tagline.textContent = v.tagline;
+        hint.classList.remove("copied", "swapping");
+        tagline.classList.remove("swapping");
+      }, 170);
+    });
+  });
 
   mark.addEventListener("click", async () => {
+    const v = VOICES[voice];
     try {
       await navigator.clipboard.writeText(EMAIL);
-      hint.textContent = "copied  ✓  " + EMAIL;
+      hint.textContent = v.copied + EMAIL;
     } catch {
-      hint.textContent = EMAIL;   // clipboard blocked — show it so it can be copied manually
+      hint.textContent = EMAIL;   // clipboard blocked \u2014 show it so it can be copied manually
     }
     hint.classList.add("copied");
     clearTimeout(resetTimer);
     resetTimer = setTimeout(() => {
-      hint.textContent = DEFAULT_HINT;
+      hint.textContent = v.hint;   // back to whichever voice is on
       hint.classList.remove("copied");
     }, 2600);
   });
