@@ -43,8 +43,8 @@ button{cursor:pointer}
 
 header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
 .head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-block:12px 4px}
-h1{font:700 1.7rem/1 var(--f-display);letter-spacing:.02em;text-transform:uppercase;margin:0}
-.status{font-size:.78rem;color:var(--muted);white-space:nowrap}
+h1{font:700 1.45rem/1.05 var(--f-display);letter-spacing:.02em;text-transform:uppercase;margin:0;min-width:0}
+.status{font-size:.78rem;color:var(--muted);white-space:nowrap;flex-shrink:0}
 .status.ok{color:var(--good)}
 nav{display:flex;gap:4px}
 nav button{flex:1;background:none;border:0;border-bottom:3px solid transparent;padding:10px 4px 8px;font:600 .95rem/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
@@ -143,3 +143,9 @@ main{padding-block:16px 120px;display:grid;gap:14px}
 .empty{color:var(--muted);font-size:.9rem;padding:6px 0}
 .hint{font-size:.82rem;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* sign-in banner */
+.banner{background:var(--accent-soft);border-bottom:1px solid var(--line)}
+.banner-in{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-block:10px;font-size:.88rem}
+.banner-in span{flex:1 1 16rem;min-width:0}
+@media (display-mode: standalone){body{overscroll-behavior-y:none}}

@@ -71,16 +71,14 @@ function loadDraft(){
   S.dirty=false; S.confirmClear=false;
 }
 let saveT=null;
-function scheduleSave(){S.dirty=true;setStatus("Unsaved…");clearTimeout(saveT);saveT=setTimeout(saveNow,2000)}
+function scheduleSave(){S.dirty=true;showSync();clearTimeout(saveT);saveT=setTimeout(saveNow,600)}
 async function saveNow(){
-  if(!S.db){setStatus("Not saving in this view");return}
   if(S.saving){S.again=true;return}
-  S.saving=true;setStatus("Saving…");
+  S.saving=true;
   const body={...JSON.parse(JSON.stringify(S.draft)),updatedAt:new Date().toISOString()};
   const id=body.date+"_"+body.day;
-  try{await S.db.collection("sessions").doc(id).set(body);S.dirty=false;setStatus("Saved",true)}
-  catch(e){setStatus(e&&e.code==="quota_exceeded"?"Storage full":"Couldn't save, retrying");if(e&&e.code==="unavailable")setTimeout(saveNow,1500+Math.random()*1000)}
-  S.saving=false;
+  try{await S.db.collection("sessions").doc(id).set(body);S.dirty=false}catch(e){}
+  S.saving=false;showSync();
   if(S.again){S.again=false;saveNow()}
 }
 
@@ -131,7 +129,6 @@ const tickIcon=()=>{const s=document.createElementNS("http://www.w3.org/2000/svg
 
 function renderLog(){
   const m=$("#main");m.replaceChildren();
-  if(!S.db&&S.loaded)m.append(el("div",{class:"notice"},"Saving isn't available right now. Reload the page."));
   m.append(el("div",{class:"daybar"},ORDER.map(k=>el("button",{type:"button","aria-pressed":String(S.day===k),onclick:()=>{S.day=k;loadDraft();renderLog()}},el("b",{},PLAN[k].name),el("span",{},PLAN[k].sub+" · ~"+PLAN[k].mins+" min")))));
   const p=PLAN[S.day];
   m.append(el("div",{class:"daterow"},
@@ -148,11 +145,11 @@ function renderLog(){
         : el("button",{type:"button",class:"btn quiet",onclick:()=>{S.confirmClear=true;renderLog()}},"Delete this session")
     ));
   }
-  m.append(el("p",{class:"hint"},"Warm up 5–10 minutes first. Finish each set with 1–2 reps in the tank. Grey numbers are last session's; tick a set to accept them."));
+  m.append(el("p",{class:"hint"},"Warm up 5–10 minutes first. Finish each set with 1–2 reps in the tank. Grey numbers are last session's; tick a set to accept them."+("wakeLock" in navigator?" The screen stays on while this tab is open.":"")));
 }
 async function clearSession(){
   const id=sid();
-  try{await S.db.collection("sessions").doc(id).delete();delete S.sessions[id];setStatus("Deleted",true)}catch(e){setStatus("Couldn't delete")}
+  try{await S.db.collection("sessions").doc(id).delete()}catch(e){}
   loadDraft();renderLog();
 }
 
@@ -236,6 +233,12 @@ function renderProgress(){
     });
     m.append(panel);
   });
+  m.append(el("section",{class:"panel"},el("h2",{},"Your data"),
+    el("p",{class:"hint"},"Download a copy for your records or a spreadsheet."),
+    el("div",{class:"row"},
+      el("button",{type:"button",class:"btn",onclick:()=>exportFile("lifts")},"Lifts (CSV)"),
+      el("button",{type:"button",class:"btn",onclick:()=>exportFile("body")},"Body (CSV)"),
+      el("button",{type:"button",class:"btn",onclick:()=>exportFile("backup")},"Full backup (JSON)"))));
 }
 
 function bodyChart(rows){
@@ -266,9 +269,8 @@ function renderBody(){
     const d=$("#b-date").value||today;
     const rec={date:d,weight:num($("#b-weight").value),arm:num($("#b-arm").value),chest:num($("#b-chest").value),waist:num($("#b-waist").value),photo:$("#b-photo").checked,updatedAt:new Date().toISOString()};
     if([rec.weight,rec.arm,rec.chest,rec.waist].every(v=>v==null)&&!rec.photo){$("#b-msg").textContent="Enter at least one measurement.";return}
-    if(!S.db){$("#b-msg").textContent="Saving isn't available in this view.";return}
     $("#b-msg").textContent="Saving…";
-    try{await S.db.collection("body").doc(d).set(rec);S.body[d]=rec;$("#b-msg").textContent="Saved for "+fmtDate(d)+".";renderBodyLists()}
+    try{await S.db.collection("body").doc(d).set(rec);$("#b-msg").textContent="Saved for "+fmtDate(d)+(Sync.state==="offline"?". It will sync when you're back online.":".");renderBodyLists()}
     catch(e){$("#b-msg").textContent="Couldn't save. Try again in a moment."}
   }},
     el("label",{for:"b-date",class:"full"},"Date",el("div",{class:"field"},el("input",{type:"date",id:"b-date",value:today,max:today,onchange:e=>{const r=S.body[e.target.value]||{};$("#b-weight").value=r.weight??"";$("#b-arm").value=r.arm??"";$("#b-chest").value=r.chest??"";$("#b-waist").value=r.waist??"";$("#b-photo").checked=!!r.photo}}))),
@@ -302,52 +304,188 @@ function render(){
   document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===S.tab)));
   ({log:renderLog,progress:renderProgress,body:renderBody})[S.tab]();
 }
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;try{localStorage.setItem("tab",S.tab)}catch(e){};render();window.scrollTo(0,0)});
-try{const t=localStorage.getItem("tab");if(t&&["log","progress","body"].includes(t))S.tab=t}catch(e){}
+/* ---------- tabs (also reachable as /log/#train, #progress, #body) ---------- */
+const HASH_TAB={train:"log",progress:"progress",body:"body"},TAB_HASH={log:"train",progress:"progress",body:"body"};
+function setTab(t){S.tab=t;try{localStorage.setItem("tab",t)}catch(e){}
+  try{history.replaceState(null,"","#"+TAB_HASH[t])}catch(e){}
+  if(t==="log"&&!S.dirty&&!S.saving)loadDraft();render();window.scrollTo(0,0)}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+try{const t=localStorage.getItem("tab");if(t&&TAB_HASH[t])S.tab=t}catch(e){}
+{const h=location.hash.slice(1);if(HASH_TAB[h])S.tab=HASH_TAB[h]}
+window.addEventListener("hashchange",()=>{const h=location.hash.slice(1);if(HASH_TAB[h]&&HASH_TAB[h]!==S.tab)setTab(HASH_TAB[h])});
+if(location.search){try{history.replaceState(null,"",location.pathname+location.hash)}catch(e){}}
 
-loadDraft();render();
+/* ---------- keep the screen on while training ---------- */
+let wakeLock=null,wakeBusy=false;
+async function syncWake(){
+  if(!("wakeLock" in navigator)||wakeBusy)return;
+  const want=S.tab==="log"&&document.visibilityState==="visible";
+  wakeBusy=true;
+  try{
+    if(want&&!wakeLock){wakeLock=await navigator.wakeLock.request("screen");wakeLock.addEventListener("release",()=>{wakeLock=null})}
+    else if(!want&&wakeLock){const w=wakeLock;wakeLock=null;await w.release()}
+  }catch(e){wakeLock=null}
+  wakeBusy=false;
+}
+const _render=render;
+render=function(){_render();syncWake()};
+document.addEventListener("pointerdown",syncWake,{passive:true});
 
-/* ---------- rker.me API adapter (same shape the page used in Claude) ---------- */
-function makeApiDb(){
-  const cache={sessions:{},body:{}},subs={sessions:[],body:[]};
-  const emit=c=>{const docs=Object.entries(cache[c]).map(([id,v])=>({id,exists:true,data:()=>v}));
-    subs[c].forEach(s=>s.next({docs,size:docs.length,empty:!docs.length,docChanges:()=>[],metadata:{fromCache:false,hasPendingWrites:false}}))};
-  async function call(method,path,body){
-    let r;
-    try{r=await fetch("/api/log"+path,{method,credentials:"same-origin",headers:body?{"content-type":"application/json"}:{},body:body?JSON.stringify(body):undefined})}
-    catch(e){throw {code:"unavailable",message:"Network or sign-in problem"}}
-    if(r.status===401||r.status===403)throw {code:"revoked",message:"Signed out"};
-    if(!r.ok)throw {code:r.status>=500?"unavailable":"invalid_argument",message:"HTTP "+r.status};
-    return r.status===204?null:r.json();
+/* ---------- export ---------- */
+const csvCell=v=>{if(v==null)return "";const t=String(v);return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
+const csv=rows=>rows.map(r=>r.map(csvCell).join(",")).join("\n")+"\n";
+function exportFile(kind){
+  const today=iso(new Date());let name,text,type;
+  if(kind==="lifts"){
+    const rows=[["date","session","exercise","set","kg","reps","done"]];
+    sessionsSorted().forEach(s=>{
+      const p=PLAN[s.day];const ids=[...(p?p.ex.map(e=>e.id):[]),...Object.keys(s.entries||{}).filter(id=>!(p&&p.ex.some(e=>e.id===id)))];
+      ids.forEach(id=>(s.entries[id]||[]).forEach((set,i)=>{if(!set)return;if(set.kg==null&&set.reps==null&&!set.done)return;
+        rows.push([s.date,p?p.name:s.day,EX[id]?EX[id].n:id,i+1,set.kg,set.reps,set.done?"yes":"no"])}));
+    });
+    name=`tennis-fitness-lifts-${today}.csv`;text=csv(rows);type="text/csv";
+  }else if(kind==="body"){
+    const rows=[["date","weight_kg","arm_cm","chest_cm","waist_cm","photo"]];
+    Object.values(S.body).sort((a,b)=>a.date<b.date?-1:1).forEach(r=>rows.push([r.date,r.weight,r.arm,r.chest,r.waist,r.photo?"yes":""]));
+    name=`tennis-fitness-body-${today}.csv`;text=csv(rows);type="text/csv";
+  }else{
+    name=`tennis-fitness-backup-${today}.json`;type="application/json";
+    text=JSON.stringify({app:"Tennis Fitness Tracker",exportedAt:new Date().toISOString(),sessions:S.sessions,body:S.body},null,2);
   }
-  async function refresh(){const d=await call("GET","");cache.sessions=d.sessions||{};cache.body=d.body||{};emit("sessions");emit("body")}
-  let started=false;
-  const start=()=>{if(started)return;started=true;
-    refresh().catch(e=>[...subs.sessions,...subs.body].forEach(s=>s.err&&s.err(e)));
-    document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!S.dirty&&!S.saving)refresh().catch(()=>{})});
-  };
-  return {collection(c){return {
-    doc(id){return {
-      set:async b=>{await call("PUT","/"+c+"/"+encodeURIComponent(id),b);cache[c][id]=b;emit(c)},
-      delete:async()=>{await call("DELETE","/"+c+"/"+encodeURIComponent(id));delete cache[c][id];emit(c)}}},
-    onSnapshot(next,err){subs[c].push({next,err});queueMicrotask(start);return ()=>{}}
-  }}};
+  const blob=new Blob([text],{type});
+  try{
+    const file=new File([blob],name,{type});
+    if(matchMedia("(pointer: coarse)").matches&&navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],title:name}).catch(()=>{});return}
+  }catch(e){}
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
 }
 
-/* ---------- connect ---------- */
-(()=>{
-  const db=makeApiDb();
-  S.loaded=true;S.db=db;setStatus("Loading…");
-  let first=true;
-  db.collection("sessions").onSnapshot(snap=>{
-    const next={};snap.docs.forEach(d=>{if(d.exists)next[d.id]=d.data()});S.sessions=next;
-    const active=document.activeElement;const typing=active&&active.tagName==="INPUT"&&active.type!=="date";
-    if(first||(!S.dirty&&!S.saving&&!(S.tab==="log"&&typing))){
-      const y=window.scrollY;loadDraft();render();window.scrollTo(0,y)}
-    if(first){first=false;setStatus("Synced",true)}
-  },()=>setStatus("Sign-in expired. Reload the page."));
-  db.collection("body").onSnapshot(snap=>{
-    const next={};snap.docs.forEach(d=>{if(d.exists)next[d.id]=d.data()});S.body=next;
-    if(S.tab==="body")renderBodyLists();else if(S.tab==="progress")renderProgress();
-  },()=>{});
-})();
+/* ---------- offline-first sync ----------
+   Every change is saved on the phone first (localStorage), queued, and sent to
+   /api/log/batch when there's a connection. The view is the last server copy
+   with the queue applied on top, so unsynced changes always show. */
+const LS_DATA="tft:data",LS_QUEUE="tft:queue",LS_REJECTED="tft:rejected";
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const Sync={server:lsGet(LS_DATA,{sessions:{},body:{}}),queue:lsGet(LS_QUEUE,[]),inflight:new Set(),
+  state:"loading",loaded:false,chain:Promise.resolve(),flushQueued:false,flushT:null,retryT:null,retryMs:5000,subs:[]};
+Sync.server.sessions=Sync.server.sessions||{};Sync.server.body=Sync.server.body||{};
+
+function viewData(){
+  const v={sessions:{...Sync.server.sessions},body:{...Sync.server.body}};
+  for(const o of Sync.queue){if(!v[o.col])continue;if(o.op==="put")v[o.col][o.id]=o.body;else delete v[o.col][o.id]}
+  return v;
+}
+function publish(){const v=viewData();S.sessions=v.sessions;S.body=v.body;Sync.subs.forEach(f=>f())}
+
+function showSync(){
+  const n=Sync.queue.length,st=Sync.state;
+  const txt=st==="loading"?"Loading…":st==="signin"?"Sign in needed":st==="offline"?(n?"Offline · "+n+" to sync":"Offline")
+    :st==="error"?"Sync problem":n?"Syncing…":"Synced";
+  setStatus(S.dirty?"Saving…":txt,st==="synced"&&!n&&!S.dirty);
+  $("#banner").hidden=st!=="signin";
+}
+function setState(st){Sync.state=st;showSync()}
+
+function serial(fn){Sync.chain=Sync.chain.then(fn,fn);return Sync.chain}
+
+async function api(method,path,body){
+  let r;
+  try{r=await fetch("/api/log"+path,{method,credentials:"same-origin",redirect:"manual",cache:"no-store",
+    keepalive:!!body&&JSON.stringify(body).length<60000,
+    headers:body?{"content-type":"application/json"}:{},body:body?JSON.stringify(body):undefined})}
+  catch(e){throw {kind:"offline"}}
+  if(r.type==="opaqueredirect"||r.status===401||r.status===403)throw {kind:"signin"};
+  if(!r.ok)throw {kind:r.status>=500||r.status===429?"offline":"bad",status:r.status};
+  return r.json();
+}
+
+function scheduleRetry(){clearTimeout(Sync.retryT);Sync.retryT=setTimeout(kick,Sync.retryMs);Sync.retryMs=Math.min(Sync.retryMs*2,60000)}
+function kick(){if(!Sync.loaded)refresh();else flush()}
+
+function enqueue(op){
+  op.qid=Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  // a newer change to the same document replaces an older one that hasn't been sent yet
+  Sync.queue=Sync.queue.filter(o=>!(o.col===op.col&&o.id===op.id&&!Sync.inflight.has(o.qid)));
+  Sync.queue.push(op);lsSet(LS_QUEUE,Sync.queue);
+  publish();showSync();flushSoon(1200);
+}
+function flushSoon(ms){clearTimeout(Sync.flushT);Sync.flushT=setTimeout(flush,ms)}
+
+function flush(){
+  if(Sync.flushQueued)return Sync.chain;
+  Sync.flushQueued=true;
+  return serial(async()=>{
+    Sync.flushQueued=false;
+    if(!Sync.queue.length||Sync.state==="signin")return;
+    const batch=Sync.queue.slice(0,100);batch.forEach(o=>Sync.inflight.add(o.qid));
+    if(Sync.state!=="offline")setState("synced");
+    try{
+      await api("POST","/batch",{ops:batch.map(({op,col,id,body})=>({op,col,id,body}))});
+      const done=new Set(batch.map(o=>o.qid));
+      for(const o of batch){if(o.op==="put")Sync.server[o.col][o.id]=o.body;else delete Sync.server[o.col][o.id]}
+      Sync.queue=Sync.queue.filter(o=>!done.has(o.qid));
+      lsSet(LS_QUEUE,Sync.queue);lsSet(LS_DATA,Sync.server);
+      Sync.retryMs=5000;clearTimeout(Sync.retryT);setState("synced");
+      if(Sync.queue.length)flushSoon(0);
+    }catch(e){
+      if(e.kind==="signin")setState("signin");
+      else if(e.kind==="bad"){ // the server can never accept these; keep them aside rather than block the queue
+        lsSet(LS_REJECTED,[...lsGet(LS_REJECTED,[]),...batch]);
+        const drop=new Set(batch.map(o=>o.qid));Sync.queue=Sync.queue.filter(o=>!drop.has(o.qid));lsSet(LS_QUEUE,Sync.queue);
+        setState("error");
+      }else{setState("offline");scheduleRetry()}
+    }finally{batch.forEach(o=>Sync.inflight.delete(o.qid))}
+  });
+}
+
+function refresh(){
+  return serial(async()=>{
+    try{
+      const d=await api("GET","");
+      Sync.server={sessions:d.sessions||{},body:d.body||{}};lsSet(LS_DATA,Sync.server);
+      Sync.loaded=true;Sync.retryMs=5000;clearTimeout(Sync.retryT);
+      setState("synced");publish();
+      if(Sync.queue.length)flushSoon(0);
+    }catch(e){
+      if(e.kind==="signin")setState("signin");else{setState("offline");scheduleRetry()}
+    }
+  });
+}
+
+// the page's storage interface; writes return as soon as the change is safe on the phone
+S.db={collection(c){return{doc(id){return{
+  set:async b=>enqueue({op:"put",col:c,id,body:JSON.parse(JSON.stringify(b))}),
+  delete:async()=>enqueue({op:"delete",col:c,id})}}}}};
+
+let firstData=true;
+Sync.subs.push(()=>{
+  const a=document.activeElement;const typing=!!a&&a.tagName==="INPUT"&&a.type!=="date"&&a.type!=="checkbox";
+  const canReload=!S.dirty&&!S.saving&&!(S.tab==="log"&&typing);
+  if(firstData||canReload){
+    loadDraft();
+    if(S.tab==="log"){const y=window.scrollY;renderLog();window.scrollTo(0,y)}
+    else if(S.tab==="progress")renderProgress();
+    else if(!typing)renderBodyLists();
+  }
+  firstData=false;
+});
+
+$("#banner-btn").onclick=()=>{
+  // a full page load (bypassing the offline copy) lets Cloudflare show the sign-in screen
+  location.href="/log/?signin="+Date.now()+location.hash;
+};
+window.addEventListener("online",()=>{if(Sync.state!=="signin")kick()});
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="hidden"){if(S.dirty){clearTimeout(saveT);saveNow()}flush()}
+  else{if(!S.dirty&&!S.saving)refresh();else flush()}
+  syncWake();
+});
+window.addEventListener("pagehide",()=>{if(S.dirty){clearTimeout(saveT);saveNow()}});
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{navigator.serviceWorker.register("/log/sw.js",{scope:"/log/"}).catch(()=>{})});
+}
+
+publish();showSync();render();refresh();

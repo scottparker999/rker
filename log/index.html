@@ -4,16 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<title>Lift Log</title>
+<title>Tennis Fitness Tracker</title>
+<meta name="description" content="Strength training log for tennis.">
+<link rel="manifest" href="/pwa/tennis-fitness/manifest.webmanifest">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#172029" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tennis Fitness">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="/pwa/tennis-fitness/apple-touch-icon.png">
+<link rel="icon" href="/pwa/tennis-fitness/icon.svg" type="image/svg+xml">
 <link rel="preload" href="/log/fonts/barlow-condensed-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/log/app.css">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<script src="/log/app.js" defer></script>
+<link rel="stylesheet" href="/log/app.css?v=1">
+<script src="/log/app.js?v=1" defer></script>
 </head>
 <body>
 <header>
   <div class="wrap">
-    <div class="head"><h1>Lift Log</h1><span class="status" id="status">Connecting…</span></div>
+    <div class="head"><h1>Tennis Fitness Tracker</h1><span class="status" id="status" role="status">Loading…</span></div>
     <nav role="tablist">
       <button role="tab" id="tab-log" data-tab="log" aria-selected="true">Train</button>
       <button role="tab" id="tab-progress" data-tab="progress" aria-selected="false">Progress</button>
@@ -21,6 +30,12 @@
     </nav>
   </div>
 </header>
+<div class="banner" id="banner" hidden>
+  <div class="wrap banner-in">
+    <span id="banner-text">Your sign-in has expired. Your changes are saved on this phone and will sync after you sign in.</span>
+    <button type="button" class="btn primary" id="banner-btn">Sign in again</button>
+  </div>
+</div>
 <main class="wrap" id="main"></main>
 <div class="timer" id="timer" hidden>
   <div class="bar" id="timer-bar"></div>
