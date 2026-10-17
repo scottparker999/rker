@@ -11,7 +11,8 @@
 
 import { DurableObject } from "cloudflare:workers";
 
-const COLLECTIONS = ["sessions", "body"];
+const COLLECTIONS = ["sessions", "body", "play"];
+const MAX_INGEST = 32_000_000;
 const ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 const MAX_BODY = 64_000;
 const MAX_OPS = 200;
@@ -20,7 +21,13 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/log")) return env.ASSETS.fetch(request);
-    if (!(await verifyAccess(request, env))) return json({ error: "Not signed in" }, 401);
+    const who = await verifyAccess(request, env);
+    if (!who) return json({ error: "Not signed in" }, 401);
+    // A service token (Health Auto Export on the phone) may only send workouts in.
+    if (!who.email) {
+      const isIngest = url.pathname.replace(/\/+$/, "") === "/api/log/ingest" && request.method === "POST";
+      if (!isIngest) return json({ error: "Not allowed" }, 403);
+    }
     return handleApi(request, env);
   },
 };
@@ -29,6 +36,25 @@ export async function handleApi(request, env) {
   const url = new URL(request.url);
   const parts = url.pathname.replace(/^\/api\/log\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
   const store = env.STORE.get(env.STORE.idFromName("main"));
+
+  // POST /api/log/ingest  Health Auto Export JSON -> tennis sessions in "play"
+  if (parts.length === 1 && parts[0] === "ingest") {
+    if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+    const len = Number(request.headers.get("content-length") || 0);
+    if (len > MAX_INGEST) return json({ error: "Too large" }, 413);
+    let payload;
+    try { payload = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
+    const workouts = (payload && payload.data && payload.data.workouts) || (payload && payload.workouts) || [];
+    if (!Array.isArray(workouts)) return json({ error: "Expected workouts" }, 400);
+    const now = new Date().toISOString();
+    const ops = [];
+    for (const w of workouts) {
+      const doc = summariseWorkout(w, now);
+      if (doc && !checkOp({ op: "put", col: "play", id: doc.id, body: doc })) ops.push({ op: "put", col: "play", id: doc.id, body: doc });
+    }
+    const applied = ops.length ? await store.apply(ops) : 0;
+    return json({ ok: true, received: workouts.length, tennis: ops.length, applied }, 200);
+  }
 
   // GET /api/log -> everything
   if (parts.length === 0) {
@@ -89,6 +115,78 @@ function checkOp(o) {
   return null;
 }
 
+// ---- Apple Health (Health Auto Export) workout -> compact tennis session ----
+const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+const qty = (v) => (v && typeof v === "object" ? num(v.qty) : num(v));
+const units = (v) => (v && typeof v === "object" && typeof v.units === "string" ? v.units.toLowerCase() : "");
+const round = (n, d = 0) => (n == null ? null : Math.round(n * 10 ** d) / 10 ** d);
+const HAE_DATE = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::(\d{2}))?\s*([+-]\d{2}):?(\d{2})?$/;
+
+function parseHaeDate(s) {
+  if (typeof s !== "string") return null;
+  const m = s.trim().match(HAE_DATE);
+  if (!m) return null;
+  const iso = `${m[1]}T${m[2]}:${m[3] || "00"}${m[4]}:${m[5] || "00"}`;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? { t, date: m[1], hhmm: m[2] } : null;
+}
+
+export function summariseWorkout(w, now) {
+  if (!w || typeof w !== "object") return null;
+  const acts = Array.isArray(w.activities) ? w.activities : [];
+  const tennis = /tennis/i.test(String(w.name || "")) || acts.some((a) => /tennis/i.test(String(a && a.activityType || "")));
+  if (!tennis) return null;
+  const st = parseHaeDate(w.start), en = parseHaeDate(w.end);
+  if (!st) return null;
+  const id = String(w.id || `${st.date}-${st.hhmm}`).replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 64);
+  if (!id) return null;
+
+  const secs = num(w.duration) ?? (en ? (en.t - st.t) / 1000 : null);
+  const kcal = (v) => { const n = qty(v); return n == null ? null : units(v).includes("kj") ? n / 4.184 : n; };
+  const km = (v) => { const n = qty(v); if (n == null) return null; const u = units(v); return u === "m" ? n / 1000 : u === "mi" ? n * 1.609344 : n; };
+  const celsius = (v) => { const n = qty(v); return n == null ? null : units(v).includes("f") ? (n - 32) * 5 / 9 : n; };
+  const hrObj = w.heartRate && typeof w.heartRate === "object" ? w.heartRate : {};
+
+  // per-minute heart-rate trace (index = minutes from start, null for gaps)
+  let hr = null;
+  if (Array.isArray(w.heartRateData) && w.heartRateData.length && secs) {
+    const mins = Math.min(600, Math.ceil(secs / 60));
+    const sum = new Array(mins).fill(0), cnt = new Array(mins).fill(0);
+    for (const s of w.heartRateData) {
+      const d = parseHaeDate(s && s.date);
+      const v = num(s && (s.Avg ?? s.avg ?? s.qty));
+      if (!d || v == null) continue;
+      const i = Math.floor((d.t - st.t) / 60000);
+      if (i >= 0 && i < mins) { sum[i] += v; cnt[i]++; }
+    }
+    hr = sum.map((v, i) => (cnt[i] ? Math.round(v / cnt[i]) : null));
+    if (!hr.some((v) => v != null)) hr = null;
+  }
+  const steps = Array.isArray(w.stepCount) ? w.stepCount.reduce((a, s) => a + (num(s && s.qty) || 0), 0) : null;
+
+  return {
+    id,
+    date: st.date,
+    start: w.start,
+    end: typeof w.end === "string" ? w.end : null,
+    startTime: st.hhmm,
+    endTime: en ? en.hhmm : null,
+    durationMin: round(secs != null ? secs / 60 : null, 1),
+    activeKcal: round(kcal(w.activeEnergyBurned)),
+    totalKcal: round(kcal(w.totalEnergy)),
+    avgHr: round(qty(w.avgHeartRate) ?? qty(hrObj.avg)),
+    maxHr: round(qty(w.maxHeartRate) ?? qty(hrObj.max)),
+    minHr: round(qty(hrObj.min)),
+    distanceKm: round(km(w.distance), 2),
+    steps: steps ? Math.round(steps) : null,
+    tempC: round(celsius(w.temperature), 1),
+    humidity: round(qty(w.humidity)),
+    hr,
+    source: "Apple Health",
+    updatedAt: now,
+  };
+}
+
 export class LogStore extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
@@ -123,7 +221,7 @@ export class LogStore extends DurableObject {
   }
 
   all() {
-    const out = { sessions: {}, body: {} };
+    const out = { sessions: {}, body: {}, play: {} };
     for (const row of this.sql.exec(`SELECT col, id, body FROM docs`)) {
       if (out[row.col]) out[row.col][row.id] = JSON.parse(row.body);
     }
@@ -206,5 +304,7 @@ async function verifyAccess(request, env) {
   if (payload.exp && payload.exp < now) return false;
   if (payload.iss !== `https://${team}.cloudflareaccess.com`) return false;
   const auds = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  return auds.some((a) => allowed.includes(a));
+  if (!auds.some((a) => allowed.includes(a))) return false;
+  // People sign in with email; service tokens carry common_name and no email.
+  return { email: typeof payload.email === "string" && payload.email ? payload.email : null };
 }

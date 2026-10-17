@@ -60,7 +60,7 @@ const fmtKg = n=>n==null?"–":(Math.round(n*10)/10).toString();
 
 function defaultDay(){const dow=new Date().getDay();for(let i=0;i<7;i++){const d=(dow+i)%7;const hit=ORDER.find(k=>PLAN[k].dow===d);if(hit)return hit}return "push"}
 
-const S = {tab:"log",day:defaultDay(),date:iso(new Date()),sessions:{},body:{},db:null,draft:null,dirty:false,saving:false,again:false,timer:null,confirmClear:false,loaded:false};
+const S = {tab:"log",day:defaultDay(),date:iso(new Date()),sessions:{},body:{},play:{},db:null,draft:null,dirty:false,saving:false,again:false,timer:null,confirmClear:false,loaded:false};
 
 /* ---------- storage ---------- */
 function setStatus(t,ok){const s=$("#status");s.textContent=t;s.classList.toggle("ok",!!ok)}
@@ -129,6 +129,9 @@ const tickIcon=()=>{const s=document.createElementNS("http://www.w3.org/2000/svg
 
 function renderLog(){
   const m=$("#main");m.replaceChildren();
+  const rt=recentTennis();
+  if(rt)m.append(el("div",{class:"notice"},el("b",{},(rt.date===iso(new Date())?"Tennis today: ":"Tennis last night: ")+fmtDur(rt.durationMin)+", "+fmtInt(rt.activeKcal)+" kcal. "),
+    "Eat a little extra today to stay in surplus"+(S.day==="upper"?", and go easy on the legs block if they're heavy.":". Grip may be tired, so stop sets when form slips.")));
   m.append(el("div",{class:"daybar"},ORDER.map(k=>el("button",{type:"button","aria-pressed":String(S.day===k),onclick:()=>{S.day=k;loadDraft();renderLog()}},el("b",{},PLAN[k].name),el("span",{},PLAN[k].sub+" · ~"+PLAN[k].mins+" min")))));
   const p=PLAN[S.day];
   m.append(el("div",{class:"daterow"},
@@ -237,6 +240,7 @@ function renderProgress(){
     el("p",{class:"hint"},"Download a copy for your records or a spreadsheet."),
     el("div",{class:"row"},
       el("button",{type:"button",class:"btn",onclick:()=>exportFile("lifts")},"Lifts (CSV)"),
+      el("button",{type:"button",class:"btn",onclick:()=>exportFile("play")},"Tennis (CSV)"),
       el("button",{type:"button",class:"btn",onclick:()=>exportFile("body")},"Body (CSV)"),
       el("button",{type:"button",class:"btn",onclick:()=>exportFile("backup")},"Full backup (JSON)"))));
 }
@@ -302,10 +306,151 @@ function renderBodyLists(){
 
 function render(){
   document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===S.tab)));
-  ({log:renderLog,progress:renderProgress,body:renderBody})[S.tab]();
+  ({log:renderLog,play:renderPlay,progress:renderProgress,body:renderBody})[S.tab]();
 }
-/* ---------- tabs (also reachable as /log/#train, #progress, #body) ---------- */
-const HASH_TAB={train:"log",progress:"progress",body:"body"},TAB_HASH={log:"train",progress:"progress",body:"body"};
+/* ---------- Play: tennis sessions from Apple Health ---------- */
+const ZONES=[{n:"Z1",lo:0,hi:.6,label:"Easy"},{n:"Z2",lo:.6,hi:.7,label:"Steady"},{n:"Z3",lo:.7,hi:.8,label:"Moderate"},{n:"Z4",lo:.8,hi:.9,label:"Hard"},{n:"Z5",lo:.9,hi:9,label:"Max"}];
+const AGE_MAX_HR=183; // 220 − 37
+function playSorted(){return Object.values(S.play||{}).filter(p=>p&&p.date).sort((a,b)=>(a.start||a.date)<(b.start||b.date)?1:-1)}
+function hrMax(){return Math.max(AGE_MAX_HR,...playSorted().map(p=>p.maxHr||0))}
+function zoneMinutes(p,max){
+  const z=[0,0,0,0,0];if(!Array.isArray(p.hr))return null;
+  for(const v of p.hr){if(v==null)continue;const r=v/max;const i=ZONES.findIndex(Z=>r>=Z.lo&&r<Z.hi);z[i<0?4:i]++}
+  return z.some(Boolean)?z:null;
+}
+const fmtDur=min=>{if(min==null)return "–";const h=Math.floor(min/60),m=Math.round(min%60);return h?h+"h "+String(m).padStart(2,"0")+"m":m+"m"};
+const fmtInt=n=>n==null?"–":Math.round(n).toLocaleString("en-AU");
+const fmtClock=hhmm=>{if(!hhmm)return "";const[h,m]=hhmm.split(":").map(Number);return (h%12||12)+":"+String(m).padStart(2,"0")+(h<12?"am":"pm")};
+function weekStart(dateStr){const d=new Date(dateStr+"T12:00:00");const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow);return iso(d)}
+
+function recentTennis(){
+  // a session that finished within the last 20 hours
+  const now=Date.now();
+  return playSorted().find(p=>{const t=Date.parse((p.end||p.start||"").replace(" ","T").replace(/ ([+-]\d\d)(\d\d)$/,"$1:$2"));return Number.isFinite(t)&&now-t>=0&&now-t<20*3600e3});
+}
+
+function zoneBar(z){
+  const total=z.reduce((a,b)=>a+b,0);
+  const bar=el("div",{class:"zbar",role:"img","aria-label":ZONES.map((Z,i)=>`${Z.n} ${z[i]} min`).join(", ")});
+  z.forEach((v,i)=>{if(v)bar.append(el("span",{class:"z"+(i+1),style:`flex-grow:${v}`,title:`${ZONES[i].n} ${ZONES[i].label}: ${v} min`}))});
+  const hard=z[3]+z[4];
+  return [bar,el("div",{class:"zlegend"},ZONES.map((Z,i)=>el("span",{},el("i",{class:"z"+(i+1)}),`${Z.n} ${z[i]}m`)),el("span",{class:"zhard"},Math.round(hard/total*100)+"% hard"))];
+}
+
+function hrTrace(p,max){
+  const ns="http://www.w3.org/2000/svg",W=600,H=140,P={l:34,r:8,t:8,b:20};
+  const pts=p.hr.map((v,i)=>v==null?null:[i,v]).filter(Boolean);if(pts.length<2)return null;
+  const lo=Math.max(40,Math.floor(Math.min(...pts.map(q=>q[1]))/20)*20),hi=Math.ceil(Math.max(...pts.map(q=>q[1]),max*.9)/20)*20;
+  const n=p.hr.length-1||1;const X=i=>P.l+i/n*(W-P.l-P.r),Y=v=>P.t+(hi-v)/(hi-lo)*(H-P.t-P.b);
+  const s=document.createElementNS(ns,"svg");s.setAttribute("viewBox",`0 0 ${W} ${H}`);s.setAttribute("class","chart");s.setAttribute("role","img");
+  s.setAttribute("aria-label",`Heart rate during the session, average ${p.avgHr}, max ${p.maxHr} bpm`);
+  const mk=(tag,a)=>{const e=document.createElementNS(ns,tag);for(const k in a)e.setAttribute(k,a[k]);return e};
+  // zone bands
+  ZONES.forEach((Z,i)=>{const top=Math.min(hi,Z.hi*max),bot=Math.max(lo,Z.lo*max);if(top<=bot)return;
+    s.append(mk("rect",{x:P.l,y:Y(top),width:W-P.l-P.r,height:Y(bot)-Y(top),class:"band z"+(i+1)}))});
+  for(let v=lo;v<=hi;v+=20){s.append(mk("line",{x1:P.l,x2:W-P.r,y1:Y(v),y2:Y(v),stroke:"var(--line)"}));const t=mk("text",{x:P.l-6,y:Y(v)+4,"text-anchor":"end"});t.textContent=v;s.append(t)}
+  let d="";let pen=false;p.hr.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?"L":"M")+X(i).toFixed(1)+","+Y(v).toFixed(1);pen=true});
+  s.append(mk("path",{d,fill:"none",stroke:"var(--ink)","stroke-width":"1.6","stroke-linejoin":"round"}));
+  const last=p.hr.length-1;[[0,"0"],[last,fmtDur(last)]].forEach(([i,l],k)=>{const t=mk("text",{x:X(i),y:H-4,"text-anchor":k?"end":"start"});t.textContent=l;s.append(t)});
+  return s;
+}
+
+function playCard(p,max){
+  const z=zoneMinutes(p,max);
+  const stats=[
+    ["Energy",fmtInt(p.activeKcal),"kcal"],["Avg HR",fmtInt(p.avgHr),"bpm"],["Max HR",fmtInt(p.maxHr),"bpm"],
+    ["Distance",p.distanceKm==null?"–":p.distanceKm.toFixed(1),"km"],["Steps",fmtInt(p.steps),""],
+    ["Court",p.tempC==null?"–":Math.round(p.tempC)+"°",p.humidity==null?"":p.humidity+"%"]];
+  const card=el("section",{class:"pcard","aria-label":"Tennis "+fmtDate(p.date)},
+    el("div",{class:"ex-top"},el("div",{},el("h2",{},fmtDate(p.date)),el("div",{class:"meta-line"},[fmtClock(p.startTime),fmtClock(p.endTime)].filter(Boolean).join(" – "))),
+      el("span",{class:"pdur"},fmtDur(p.durationMin))),
+    el("dl",{class:"pstats"},stats.map(([k,v,u])=>el("div",{},el("dt",{},k),el("dd",{},el("b",{class:"num"},v),u?" "+u:"")))),
+    z?zoneBar(z):null);
+  if(Array.isArray(p.hr)&&p.hr.some(v=>v!=null)){
+    const det=el("details",{class:"how"},el("summary",{},"Heart rate trace"));
+    det.addEventListener("toggle",()=>{if(det.open&&!det.querySelector("svg")){const c=hrTrace(p,max);if(c)det.append(c)}},{once:false});
+    card.append(det);
+  }
+  return card;
+}
+
+function weeklyChart(weeks){
+  const ns="http://www.w3.org/2000/svg",W=600,H=170,P={l:30,r:8,t:12,b:24};
+  const mk=(tag,a)=>{const e=document.createElementNS(ns,tag);for(const k in a)e.setAttribute(k,a[k]);return e};
+  const maxH=Math.max(4,Math.ceil(Math.max(...weeks.map(w=>w.min/60))));
+  const s=mk("svg",{viewBox:`0 0 ${W} ${H}`,class:"chart",role:"img","aria-label":"Hours of tennis per week, last 8 weeks"});
+  const bw=(W-P.l-P.r)/weeks.length,Y=v=>P.t+(maxH-v)/maxH*(H-P.t-P.b);
+  const step=maxH>8?2:1;
+  for(let v=0;v<=maxH;v+=step){s.append(mk("line",{x1:P.l,x2:W-P.r,y1:Y(v),y2:Y(v),stroke:"var(--line)"}));const t=mk("text",{x:P.l-6,y:Y(v)+4,"text-anchor":"end"});t.textContent=v+"h";s.append(t)}
+  weeks.forEach((w,i)=>{const h=w.min/60,x=P.l+i*bw+bw*.18,wd=bw*.64;
+    if(h>0)s.append(mk("rect",{x,y:Y(h),width:wd,height:Y(0)-Y(h),rx:3,fill:i===weeks.length-1?"var(--accent)":"var(--accent-soft)",stroke:"var(--accent)","stroke-width":i===weeks.length-1?0:1}));
+    if(w.n){const t=mk("text",{x:x+wd/2,y:Y(h)-5,"text-anchor":"middle"});t.textContent=w.n+"×";s.append(t)}
+    const t=mk("text",{x:x+wd/2,y:H-6,"text-anchor":"middle"});t.textContent=i===weeks.length-1?"This wk":fmtShort(w.start);s.append(t)});
+  return s;
+}
+
+let playShown=8;
+function renderPlay(){
+  const m=$("#main");m.replaceChildren();
+  const list=playSorted(),max=hrMax();
+  const thisWk=weekStart(iso(new Date()));
+  const weeks=[];for(let i=7;i>=0;i--){const d=new Date(thisWk+"T12:00:00");d.setDate(d.getDate()-7*i);weeks.push({start:iso(d),min:0,n:0,kcal:0})}
+  list.forEach(p=>{const w=weeks.find(w=>w.start===weekStart(p.date));if(w){w.min+=p.durationMin||0;w.n++;w.kcal+=p.activeKcal||0}});
+  const cur=weeks[weeks.length-1],prev=weeks.slice(3,7),avgMin=prev.reduce((a,w)=>a+w.min,0)/4;
+
+  if(!list.length){
+    m.append(el("section",{class:"panel"},el("h2",{},"Tennis"),
+      el("p",{class:"empty"},"No tennis sessions yet. They appear here automatically once Health Auto Export is syncing your Apple Watch workouts. You can also import an export file below.")));
+  }else{
+    m.append(el("section",{class:"panel"},el("h2",{},"This week"),
+      el("div",{class:"kpis"},
+        el("div",{class:"kpi"},el("b",{class:"num"},String(cur.n)),el("span",{},cur.n===1?"session":"sessions")),
+        el("div",{class:"kpi"},el("b",{class:"num"},fmtDur(cur.min)),el("span",{},"court time")),
+        el("div",{class:"kpi"},el("b",{class:"num"},fmtInt(cur.kcal)),el("span",{},"kcal burned"))),
+      el("p",{class:"hint"},avgMin?`Your 4-week average is ${fmtDur(avgMin)} a week.`:"Averages appear once you have a few weeks of sessions."),
+      weeklyChart(weeks)));
+    const sec=el("div",{class:"plist"});
+    list.slice(0,playShown).forEach(p=>sec.append(playCard(p,max)));
+    m.append(sec);
+    if(list.length>playShown)m.append(el("button",{type:"button",class:"btn",onclick:()=>{playShown+=8;renderPlay()}},`Show older sessions (${list.length-playShown})`));
+    m.append(el("p",{class:"hint"},`Heart-rate zones use your highest recorded heart rate, ${max} bpm.`));
+  }
+
+  const last=list.reduce((a,p)=>p.updatedAt&&p.updatedAt>a?p.updatedAt:a,"");
+  const inp=el("input",{type:"file",id:"play-file",accept:".json,application/json",hidden:true,onchange:e=>importHealthFile(e.target.files&&e.target.files[0])});
+  m.append(el("section",{class:"panel"},el("h2",{},"Apple Health"),
+    el("p",{class:"hint"},last?`Last update received ${new Date(last).toLocaleString("en-AU",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}.`:"Nothing received from Health Auto Export yet."),
+    el("div",{class:"row"},el("button",{type:"button",class:"btn",onclick:()=>inp.click()},"Import export file"),inp,el("span",{class:"hint",id:"play-msg","aria-live":"polite"},playMsgText))));
+}
+
+let playMsgText="";
+const msg={set textContent(t){playMsgText=t;const e=$("#play-msg");if(e)e.textContent=t}};
+async function importHealthFile(file){
+  if(!file)return;
+  msg.textContent="Reading…";
+  let data;try{data=JSON.parse(await file.text())}catch(e){msg.textContent="That file isn't a Health Auto Export JSON file.";return}
+  const all=(data&&data.data&&data.data.workouts)||(data&&data.workouts)||[];
+  const keep=["id","name","start","end","duration","activeEnergyBurned","totalEnergy","avgHeartRate","maxHeartRate","heartRate","heartRateData","distance","stepCount","temperature","humidity","activities"];
+  const tennis=all.filter(w=>w&&(/tennis/i.test(w.name||"")||(w.activities||[]).some(a=>/tennis/i.test((a&&a.activityType)||""))))
+    .map(w=>{const o={};keep.forEach(k=>{if(w[k]!==undefined)o[k]=w[k]});if(Array.isArray(o.activities))o.activities=o.activities.map(a=>({activityType:a.activityType}));return o});
+  if(!tennis.length){msg.textContent=all.length?"No tennis sessions in that file.":"No workouts in that file. Include Workouts when exporting.";return}
+  let done=0;
+  try{
+    for(let i=0;i<tennis.length;i+=10){
+      msg.textContent=`Importing ${Math.min(i+10,tennis.length)} of ${tennis.length}…`;
+      const r=await api("POST","/ingest",{data:{workouts:tennis.slice(i,i+10)}});done+=r.tennis||0;
+    }
+    msg.textContent=`Imported ${done} tennis session${done===1?"":"s"}.`;
+    await refresh();
+  }catch(e){
+    msg.textContent=e.kind==="signin"?"Sign in again, then retry the import.":e.kind==="offline"?"You're offline. Try again with a connection.":"Import failed. Try a smaller date range.";
+    if(e.kind==="signin")setState("signin");
+  }
+  $("#play-file")&&($("#play-file").value="");
+}
+
+/* ---------- tabs (also reachable as /log/#train, #play, #progress, #body) ---------- */
+const HASH_TAB={train:"log",play:"play",progress:"progress",body:"body"},TAB_HASH={log:"train",play:"play",progress:"progress",body:"body"};
 function setTab(t){S.tab=t;try{localStorage.setItem("tab",t)}catch(e){}
   try{history.replaceState(null,"","#"+TAB_HASH[t])}catch(e){}
   if(t==="log"&&!S.dirty&&!S.saving)loadDraft();render();window.scrollTo(0,0)}
@@ -344,13 +489,17 @@ function exportFile(kind){
         rows.push([s.date,p?p.name:s.day,EX[id]?EX[id].n:id,i+1,set.kg,set.reps,set.done?"yes":"no"])}));
     });
     name=`tennis-fitness-lifts-${today}.csv`;text=csv(rows);type="text/csv";
+  }else if(kind==="play"){
+    const rows=[["date","start","end","minutes","active_kcal","avg_hr","max_hr","distance_km","steps","temp_c","humidity_pct"]];
+    playSorted().slice().reverse().forEach(p=>rows.push([p.date,p.startTime,p.endTime,p.durationMin,p.activeKcal,p.avgHr,p.maxHr,p.distanceKm,p.steps,p.tempC,p.humidity]));
+    name=`tennis-fitness-play-${today}.csv`;text=csv(rows);type="text/csv";
   }else if(kind==="body"){
     const rows=[["date","weight_kg","arm_cm","chest_cm","waist_cm","photo"]];
     Object.values(S.body).sort((a,b)=>a.date<b.date?-1:1).forEach(r=>rows.push([r.date,r.weight,r.arm,r.chest,r.waist,r.photo?"yes":""]));
     name=`tennis-fitness-body-${today}.csv`;text=csv(rows);type="text/csv";
   }else{
     name=`tennis-fitness-backup-${today}.json`;type="application/json";
-    text=JSON.stringify({app:"Tennis Fitness Tracker",exportedAt:new Date().toISOString(),sessions:S.sessions,body:S.body},null,2);
+    text=JSON.stringify({app:"Tennis Fitness Tracker",exportedAt:new Date().toISOString(),sessions:S.sessions,body:S.body,play:S.play},null,2);
   }
   const blob=new Blob([text],{type});
   try{
@@ -370,14 +519,14 @@ const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 const Sync={server:lsGet(LS_DATA,{sessions:{},body:{}}),queue:lsGet(LS_QUEUE,[]),inflight:new Set(),
   state:"loading",loaded:false,chain:Promise.resolve(),flushQueued:false,flushT:null,retryT:null,retryMs:5000,subs:[]};
-Sync.server.sessions=Sync.server.sessions||{};Sync.server.body=Sync.server.body||{};
+Sync.server.sessions=Sync.server.sessions||{};Sync.server.body=Sync.server.body||{};Sync.server.play=Sync.server.play||{};
 
 function viewData(){
-  const v={sessions:{...Sync.server.sessions},body:{...Sync.server.body}};
+  const v={sessions:{...Sync.server.sessions},body:{...Sync.server.body},play:{...Sync.server.play}};
   for(const o of Sync.queue){if(!v[o.col])continue;if(o.op==="put")v[o.col][o.id]=o.body;else delete v[o.col][o.id]}
   return v;
 }
-function publish(){const v=viewData();S.sessions=v.sessions;S.body=v.body;Sync.subs.forEach(f=>f())}
+function publish(){const v=viewData();S.sessions=v.sessions;S.body=v.body;S.play=v.play;Sync.subs.forEach(f=>f())}
 
 function showSync(){
   const n=Sync.queue.length,st=Sync.state;
@@ -444,7 +593,7 @@ function refresh(){
   return serial(async()=>{
     try{
       const d=await api("GET","");
-      Sync.server={sessions:d.sessions||{},body:d.body||{}};lsSet(LS_DATA,Sync.server);
+      Sync.server={sessions:d.sessions||{},body:d.body||{},play:d.play||{}};lsSet(LS_DATA,Sync.server);
       Sync.loaded=true;Sync.retryMs=5000;clearTimeout(Sync.retryT);
       setState("synced");publish();
       if(Sync.queue.length)flushSoon(0);
@@ -467,6 +616,7 @@ Sync.subs.push(()=>{
     loadDraft();
     if(S.tab==="log"){const y=window.scrollY;renderLog();window.scrollTo(0,y)}
     else if(S.tab==="progress")renderProgress();
+    else if(S.tab==="play")renderPlay();
     else if(!typing)renderBodyLists();
   }
   firstData=false;
