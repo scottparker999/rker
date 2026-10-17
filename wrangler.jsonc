@@ -15,6 +15,6 @@
     // Zero Trust team name: the part before .cloudflareaccess.com
     "ACCESS_TEAM": "REPLACE_WITH_TEAM_NAME",
     // Application Audience (AUD) tag(s) of the Access app(s) covering /log and /api/log, comma-separated
-    "ACCESS_AUD": "REPLACE_WITH_AUD_TAG"
+    "ACCESS_AUD": "9fdf2b2e5999e86a6991771e9570de363058dbec292e1b5198d03a643f963473"
   }
 }
