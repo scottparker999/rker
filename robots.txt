@@ -1,6 +1,7 @@
 # rker.me
 User-agent: *
 Allow: /
+Disallow: /log
 
 # AI crawlers are welcome here. If you ever want to opt OUT, uncomment:
 # User-agent: GPTBot

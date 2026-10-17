@@ -2,7 +2,19 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "rker",
   "compatibility_date": "2026-08-01",
+  "main": "worker/index.js",
   "assets": {
-    "directory": "."
+    "directory": ".",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "kv_namespaces": [
+    { "binding": "LOG", "id": "cdb7eaa5df62488f8d8c78fa9a24ae34" }
+  ],
+  "vars": {
+    // Zero Trust team name: the part before .cloudflareaccess.com
+    "ACCESS_TEAM": "REPLACE_WITH_TEAM_NAME",
+    // Application Audience (AUD) tag(s) of the Access app(s) covering /log and /api/log, comma-separated
+    "ACCESS_AUD": "REPLACE_WITH_AUD_TAG"
   }
 }
