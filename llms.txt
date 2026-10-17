@@ -8,7 +8,6 @@
 
 ## Pages
 - [CV](https://rker.me/cv): narrative career summary and capabilities
-- [Colophon](https://rker.me/colophon): how this site is built
 
 ## Contact
 - Email: p@rker.me
