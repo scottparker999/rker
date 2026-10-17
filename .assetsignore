@@ -7,3 +7,12 @@ README.md
 *.test.mjs
 worker/
 .wrangler/
+
+# Hidden for the moment. Delete these two lines to publish them again;
+# the nav links and sitemap entries come back with them.
+writing/
+tools/
+
+# Stray duplicate of the home page from an old upload. Nothing links to it,
+# it is stale, and it points at /writing/ which is now hidden.
+mnt/
