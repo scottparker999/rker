@@ -1,10 +1,10 @@
 // Tennis Fitness Tracker service worker: keeps the app shell available offline.
 // Bump VERSION whenever app.css, app.js or the fonts change.
-const VERSION = "tft-v3";
+const VERSION = "tft-v4";
 const SHELL = [
   "/log/",
-  "/log/app.css?v=3",
-  "/log/app.js?v=3",
+  "/log/app.css?v=4",
+  "/log/app.js?v=4",
   "/log/fonts/barlow-condensed-latin-600-normal.woff2",
   "/log/fonts/barlow-condensed-latin-700-normal.woff2",
   "/log/fonts/ibm-plex-sans-latin-400-normal.woff2",
@@ -40,6 +40,8 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin || !url.pathname.startsWith("/log/")) return;
 
   if (req.mode === "navigate") {
+    // "Sign in again" adds ?signin=…: always go to the network so Cloudflare can show its sign-in page
+    if (url.searchParams.has("signin")) return;
     event.respondWith(navigate(event));
     return;
   }

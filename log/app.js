@@ -60,26 +60,27 @@ const fmtKg = n=>n==null?"–":(Math.round(n*10)/10).toString();
 
 function defaultDay(){const dow=new Date().getDay();for(let i=0;i<7;i++){const d=(dow+i)%7;const hit=ORDER.find(k=>PLAN[k].dow===d);if(hit)return hit}return "push"}
 
-const S = {tab:"log",day:defaultDay(),date:iso(new Date()),sessions:{},body:{},play:{},db:null,draft:null,dirty:false,saving:false,again:false,timer:null,confirmClear:false,loaded:false};
+const S = {tab:"log",day:defaultDay(),date:iso(new Date()),autoDate:true,sessions:{},body:{},play:{},db:null,draft:null,dirty:false,timer:null,confirmClear:false};
 
 /* ---------- storage ---------- */
 function setStatus(t,ok){const s=$("#status");s.textContent=t;s.classList.toggle("ok",!!ok)}
 const sid = ()=>S.date+"_"+S.day;
 function loadDraft(){
+  saveNow(); // keep any edit still waiting for its save before switching drafts
   const ex=S.sessions[sid()];
   S.draft = ex?JSON.parse(JSON.stringify(ex)):{date:S.date,day:S.day,entries:{}};
   S.dirty=false; S.confirmClear=false;
 }
 let saveT=null;
 function scheduleSave(){S.dirty=true;showSync();clearTimeout(saveT);saveT=setTimeout(saveNow,600)}
-async function saveNow(){
-  if(S.saving){S.again=true;return}
-  S.saving=true;
+// Saving is synchronous: the change is queued on the phone straight away and synced later.
+function saveNow(){
+  clearTimeout(saveT);
+  if(!S.dirty||!S.draft)return;
   const body={...JSON.parse(JSON.stringify(S.draft)),updatedAt:new Date().toISOString()};
-  const id=body.date+"_"+body.day;
-  try{await S.db.collection("sessions").doc(id).set(body);S.dirty=false}catch(e){}
-  S.saving=false;showSync();
-  if(S.again){S.again=false;saveNow()}
+  S.dirty=false;
+  S.db.collection("sessions").doc(body.date+"_"+body.day).set(body);
+  showSync();
 }
 
 /* ---------- history helpers ---------- */
@@ -132,10 +133,10 @@ function renderLog(){
   const rt=recentTennis();
   if(rt)m.append(el("div",{class:"notice"},el("b",{},(rt.date===iso(new Date())?"Tennis today: ":"Tennis last night: ")+fmtDur(rt.durationMin)+", "+fmtInt(rt.activeKcal)+" kcal. "),
     "Eat a little extra today to stay in surplus"+(S.day==="upper"?", and go easy on the legs block if they're heavy.":". Grip may be tired, so stop sets when form slips.")));
-  m.append(el("div",{class:"daybar"},ORDER.map(k=>el("button",{type:"button","aria-pressed":String(S.day===k),onclick:()=>{S.day=k;loadDraft();renderLog()}},el("b",{},PLAN[k].name),el("span",{},PLAN[k].sub+" · ~"+PLAN[k].mins+" min")))));
+  m.append(el("div",{class:"daybar"},ORDER.map(k=>el("button",{type:"button","aria-pressed":String(S.day===k),onclick:()=>{saveNow();S.day=k;loadDraft();renderLog()}},el("b",{},PLAN[k].name),el("span",{},PLAN[k].sub+" · ~"+PLAN[k].mins+" min")))));
   const p=PLAN[S.day];
   m.append(el("div",{class:"daterow"},
-    el("label",{for:"sess-date"},"Session date ",el("input",{type:"date",id:"sess-date",value:S.date,max:iso(new Date()),onchange:e=>{if(e.target.value){S.date=e.target.value;loadDraft();renderLog()}}})),
+    el("label",{for:"sess-date"},"Session date ",el("input",{type:"date",id:"sess-date",value:S.date,max:iso(new Date()),onchange:e=>{if(e.target.value){saveNow();S.date=e.target.value;S.autoDate=S.date===iso(new Date());loadDraft();renderLog()}}})),
     el("span",{},S.sessions[sid()]?"Logged · edits save automatically":"Ticks save automatically")
   ));
   p.ex.forEach((e,idx)=>m.append(exCard(e,p.ex[idx+1])));
@@ -150,9 +151,9 @@ function renderLog(){
   }
   m.append(el("p",{class:"hint"},"Warm up 5–10 minutes first. Finish each set with 1–2 reps in the tank. Grey numbers are last session's; tick a set to accept them."+("wakeLock" in navigator?" The screen stays on while this tab is open.":"")));
 }
-async function clearSession(){
-  const id=sid();
-  try{await S.db.collection("sessions").doc(id).delete()}catch(e){}
+function clearSession(){
+  clearTimeout(saveT);S.dirty=false; // drop the pending save so it can't bring the session back
+  S.db.collection("sessions").doc(sid()).delete();
   loadDraft();renderLog();
 }
 
@@ -283,7 +284,7 @@ function renderBody(){
     el("div",{class:"row full"},el("button",{type:"submit",class:"btn primary"},"Save entry"),el("span",{class:"hint",id:"b-msg","aria-live":"polite"}))
   );
   m.append(el("section",{class:"panel"},el("h2",{},"Log measurements"),el("p",{class:"hint"},"Weigh in weekly, same time of day. Measure arms and chest monthly."),form));
-  m.append(el("div",{id:"body-lists",style:"display:grid;gap:14px"}));
+  m.append(el("div",{id:"body-lists",class:"stack"}));
   renderBodyLists();
 }
 function renderBodyLists(){
@@ -307,6 +308,7 @@ function renderBodyLists(){
 function render(){
   document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===S.tab)));
   ({log:renderLog,play:renderPlay,progress:renderProgress,body:renderBody})[S.tab]();
+  syncWake();
 }
 /* ---------- Play: tennis sessions from Apple Health ---------- */
 const ZONES=[{n:"Z1",lo:0,hi:.6,label:"Easy"},{n:"Z2",lo:.6,hi:.7,label:"Steady"},{n:"Z3",lo:.7,hi:.8,label:"Moderate"},{n:"Z4",lo:.8,hi:.9,label:"Hard"},{n:"Z5",lo:.9,hi:9,label:"Max"}];
@@ -332,7 +334,7 @@ function recentTennis(){
 function zoneBar(z){
   const total=z.reduce((a,b)=>a+b,0);
   const bar=el("div",{class:"zbar",role:"img","aria-label":ZONES.map((Z,i)=>`${Z.n} ${z[i]} min`).join(", ")});
-  z.forEach((v,i)=>{if(v)bar.append(el("span",{class:"z"+(i+1),style:`flex-grow:${v}`,title:`${ZONES[i].n} ${ZONES[i].label}: ${v} min`}))});
+  z.forEach((v,i)=>{if(!v)return;const seg=el("span",{class:"z"+(i+1),title:`${ZONES[i].n} ${ZONES[i].label}: ${v} min`});seg.style.flexGrow=v;bar.append(seg)});
   const hard=z[3]+z[4];
   return [bar,el("div",{class:"zlegend"},ZONES.map((Z,i)=>el("span",{},el("i",{class:"z"+(i+1)}),`${Z.n} ${z[i]}m`)),el("span",{class:"zhard"},Math.round(hard/total*100)+"% hard"))];
 }
@@ -456,7 +458,7 @@ async function importHealthFile(file){
 const HASH_TAB={train:"log",play:"play",progress:"progress",body:"body"},TAB_HASH={log:"train",play:"play",progress:"progress",body:"body"};
 function setTab(t){S.tab=t;try{localStorage.setItem("tab",t)}catch(e){}
   try{history.replaceState(null,"","#"+TAB_HASH[t])}catch(e){}
-  if(t==="log"&&!S.dirty&&!S.saving)loadDraft();render();window.scrollTo(0,0)}
+  if(t==="log")loadDraft();render();window.scrollTo(0,0)}
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 try{const t=localStorage.getItem("tab");if(t&&TAB_HASH[t])S.tab=t}catch(e){}
 {const h=location.hash.slice(1);if(HASH_TAB[h])S.tab=HASH_TAB[h]}
@@ -475,8 +477,6 @@ async function syncWake(){
   }catch(e){wakeLock=null}
   wakeBusy=false;
 }
-const _render=render;
-render=function(){_render();syncWake()};
 document.addEventListener("pointerdown",syncWake,{passive:true});
 
 /* ---------- export ---------- */
@@ -571,8 +571,10 @@ function flush(){
   return serial(async()=>{
     Sync.flushQueued=false;
     if(!Sync.queue.length||Sync.state==="signin")return;
-    const batch=Sync.queue.slice(0,100);batch.forEach(o=>Sync.inflight.add(o.qid));
-    if(Sync.state!=="offline")setState("synced");
+    // send at most ~200 KB per request so a long offline stretch can't exceed the server's limit
+    const batch=[];let bytes=0;
+    for(const o of Sync.queue){const b=JSON.stringify(o).length;if(batch.length&&(bytes+b>200000||batch.length>=100))break;batch.push(o);bytes+=b}
+    batch.forEach(o=>Sync.inflight.add(o.qid));
     try{
       await api("POST","/batch",{ops:batch.map(({op,col,id,body})=>({op,col,id,body}))});
       const done=new Set(batch.map(o=>o.qid));
@@ -614,7 +616,7 @@ S.db={collection(c){return{doc(id){return{
 let firstData=true;
 Sync.subs.push(()=>{
   const a=document.activeElement;const typing=!!a&&a.tagName==="INPUT"&&a.type!=="date"&&a.type!=="checkbox";
-  const canReload=!S.dirty&&!S.saving&&!(S.tab==="log"&&typing);
+  const canReload=!S.dirty&&!(S.tab==="log"&&typing);
   if(firstData||canReload){
     loadDraft();
     if(S.tab==="log"){const y=window.scrollY;renderLog();window.scrollTo(0,y)}
@@ -631,11 +633,16 @@ $("#banner-btn").onclick=()=>{
 };
 window.addEventListener("online",()=>{if(Sync.state!=="signin")kick()});
 document.addEventListener("visibilitychange",()=>{
-  if(document.visibilityState==="hidden"){if(S.dirty){clearTimeout(saveT);saveNow()}flush()}
-  else{if(!S.dirty&&!S.saving)refresh();else flush()}
+  if(document.visibilityState==="hidden"){saveNow();flush()}
+  else{
+    // the app can sit in memory for days; move to today's session unless a date was picked by hand
+    const today=iso(new Date());
+    if(S.autoDate&&S.date!==today){saveNow();S.date=today;S.day=defaultDay();loadDraft();render()}
+    refresh();
+  }
   syncWake();
 });
-window.addEventListener("pagehide",()=>{if(S.dirty){clearTimeout(saveT);saveNow()}});
+window.addEventListener("pagehide",saveNow);
 
 if("serviceWorker" in navigator){
   window.addEventListener("load",()=>{navigator.serviceWorker.register("/log/sw.js",{scope:"/log/"}).catch(()=>{})});

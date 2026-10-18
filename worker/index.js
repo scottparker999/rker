@@ -3,8 +3,8 @@
 //
 // Storage is a single SQLite-backed Durable Object, which is strongly consistent:
 // a batch of queued offline changes is applied in one transaction, so saves can
-// never overwrite each other. On first use it imports the earlier KV data (the
-// KV copy is left in place as a backup).
+// never overwrite each other. (The original KV copy of the data is still in the
+// "fitness-log" KV namespace as a backup; nothing reads it any more.)
 //
 // Cloudflare Access sits in front of /log and /api/log; this Worker also verifies
 // the Access token itself, so the API stays locked even if Access is misconfigured.
@@ -21,6 +21,10 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/log")) return env.ASSETS.fetch(request);
+    // Refuse requests started by other websites (the Access cookie would ride along).
+    const origin = request.headers.get("origin");
+    const site = request.headers.get("sec-fetch-site");
+    if ((origin && origin !== url.origin) || site === "cross-site") return json({ error: "Not allowed" }, 403);
     const who = await verifyAccess(request, env);
     if (!who) return json({ error: "Not signed in" }, 401);
     // A service token (Health Auto Export on the phone) may only send workouts in.
@@ -34,16 +38,20 @@ export default {
 
 export async function handleApi(request, env) {
   const url = new URL(request.url);
-  const parts = url.pathname.replace(/^\/api\/log\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
+  const parts = url.pathname.replace(/^\/api\/log\/?/, "").split("/").filter(Boolean);
   const store = env.STORE.get(env.STORE.idFromName("main"));
+  if (request.method === "POST" && !/^application\/json\b/i.test(request.headers.get("content-type") || "")) {
+    return json({ error: "Expected application/json" }, 415);
+  }
 
   // POST /api/log/ingest  Health Auto Export JSON -> tennis sessions in "play"
   if (parts.length === 1 && parts[0] === "ingest") {
     if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
-    const len = Number(request.headers.get("content-length") || 0);
-    if (len > MAX_INGEST) return json({ error: "Too large" }, 413);
+    if (Number(request.headers.get("content-length") || 0) > MAX_INGEST) return json({ error: "Too large" }, 413);
+    const raw = await request.text();
+    if (raw.length > MAX_INGEST) return json({ error: "Too large" }, 413);
     let payload;
-    try { payload = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
+    try { payload = JSON.parse(raw); } catch { return json({ error: "Invalid JSON" }, 400); }
     const workouts = (payload && payload.data && payload.data.workouts) || (payload && payload.workouts) || [];
     if (!Array.isArray(workouts)) return json({ error: "Expected workouts" }, 400);
     const now = new Date().toISOString();
@@ -81,28 +89,7 @@ export async function handleApi(request, env) {
     return json({ ok: true, applied: res.applied }, 200);
   }
 
-  // PUT / DELETE /api/log/<col>/<id>  (single-document form, kept for older cached pages)
-  const [col, id] = parts;
-  if (parts.length !== 2) return json({ error: "Not found" }, 404);
-  if (request.method === "PUT") {
-    const raw = await request.text();
-    if (raw.length > MAX_BODY) return json({ error: "Too large" }, 413);
-    let body;
-    try { body = JSON.parse(raw); } catch { return json({ error: "Invalid JSON" }, 400); }
-    const op = { op: "put", col, id, body };
-    const err = checkOp(op);
-    if (err) return json({ error: err }, 400);
-    await store.apply([op]);
-    return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
-  }
-  if (request.method === "DELETE") {
-    const op = { op: "delete", col, id };
-    const err = checkOp(op);
-    if (err) return json({ error: err }, 400);
-    await store.apply([op]);
-    return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
-  }
-  return json({ error: "Method not allowed" }, 405);
+  return json({ error: "Not found" }, 404);
 }
 
 function checkOp(o) {
@@ -193,33 +180,9 @@ export class LogStore extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
-    ctx.blockConcurrencyWhile(async () => {
-      this.sql.exec(`CREATE TABLE IF NOT EXISTS docs (
-        col TEXT NOT NULL, id TEXT NOT NULL, body TEXT NOT NULL, updated_at TEXT,
-        PRIMARY KEY (col, id))`);
-      this.sql.exec(`CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)`);
-      const done = this.sql.exec(`SELECT v FROM meta WHERE k = 'kv_imported'`).toArray();
-      if (!done.length) await this.importFromKv(env);
-    });
-  }
-
-  async importFromKv(env) {
-    let data = null;
-    try { data = env.LOG ? await env.LOG.get("data", { type: "json" }) : null; } catch { data = null; }
-    this.ctx.storage.transactionSync(() => {
-      if (data) {
-        for (const col of COLLECTIONS) {
-          for (const [id, body] of Object.entries(data[col] || {})) {
-            if (!ID_RE.test(id) || !body || typeof body !== "object") continue;
-            this.sql.exec(
-              `INSERT OR IGNORE INTO docs (col, id, body, updated_at) VALUES (?, ?, ?, ?)`,
-              col, id, JSON.stringify(body), typeof body.updatedAt === "string" ? body.updatedAt : null,
-            );
-          }
-        }
-      }
-      this.sql.exec(`INSERT OR REPLACE INTO meta (k, v) VALUES ('kv_imported', ?)`, new Date().toISOString());
-    });
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS docs (
+      col TEXT NOT NULL, id TEXT NOT NULL, body TEXT NOT NULL, updated_at TEXT,
+      PRIMARY KEY (col, id))`);
   }
 
   all() {
@@ -267,13 +230,19 @@ function json(obj, status) {
 // ---- Cloudflare Access token check (fails closed if not configured) ----
 let certs = { at: 0, keys: [] };
 
-async function accessKeys(team) {
-  if (certs.keys.length && Date.now() - certs.at < 3_600_000) return certs.keys;
-  const res = await fetch(`https://${team}.cloudflareaccess.com/cdn-cgi/access/certs`);
-  if (!res.ok) return [];
-  const body = await res.json();
-  certs = { at: Date.now(), keys: body.keys || [] };
-  return certs.keys;
+// Cached for an hour; refetched early (at most once a minute) when Cloudflare
+// rotates its signing keys and a token arrives with an unknown key id.
+async function accessKey(team, kid) {
+  const fresh = Date.now() - certs.at < 3_600_000;
+  let jwk = fresh ? certs.keys.find((k) => k.kid === kid) : null;
+  if (!jwk && Date.now() - certs.at > 60_000) {
+    try {
+      const res = await fetch(`https://${team}.cloudflareaccess.com/cdn-cgi/access/certs`);
+      if (res.ok) certs = { at: Date.now(), keys: (await res.json()).keys || [] };
+    } catch {}
+    jwk = certs.keys.find((k) => k.kid === kid);
+  }
+  return jwk || null;
 }
 
 const b64u = (s) =>
@@ -297,14 +266,15 @@ async function verifyAccess(request, env) {
   } catch { return false; }
   if (header.alg !== "RS256") return false;
 
-  const jwk = (await accessKeys(team)).find((k) => k.kid === header.kid);
+  const jwk = await accessKey(team, header.kid);
   if (!jwk) return false;
   const key = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
   const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64u(s), new TextEncoder().encode(`${h}.${p}`));
   if (!ok) return false;
 
   const now = Date.now() / 1000;
-  if (payload.exp && payload.exp < now) return false;
+  if (typeof payload.exp !== "number" || payload.exp < now) return false;
+  if (typeof payload.nbf === "number" && payload.nbf > now + 60) return false;
   if (payload.iss !== `https://${team}.cloudflareaccess.com`) return false;
   const auds = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
   if (!auds.some((a) => allowed.includes(a))) return false;

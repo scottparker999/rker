@@ -14,10 +14,6 @@
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["LogStore"] }
   ],
-  // Earlier storage for the tracker; read once to import into STORE, kept as a backup
-  "kv_namespaces": [
-    { "binding": "LOG", "id": "cdb7eaa5df62488f8d8c78fa9a24ae34" }
-  ],
   "vars": {
     // Zero Trust team name: the part before .cloudflareaccess.com
     "ACCESS_TEAM": "misty-brook-383f",
