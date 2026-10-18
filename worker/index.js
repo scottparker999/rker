@@ -52,8 +52,10 @@ export async function handleApi(request, env) {
       const doc = summariseWorkout(w, now);
       if (doc && !checkOp({ op: "put", col: "play", id: doc.id, body: doc })) ops.push({ op: "put", col: "play", id: doc.id, body: doc });
     }
-    const applied = ops.length ? await store.apply(ops) : 0;
-    return json({ ok: true, received: workouts.length, tennis: ops.length, applied }, 200);
+    const res = ops.length ? await store.apply(ops) : { applied: 0, created: 0 };
+    const dates = ops.map((o) => o.body.date).sort();
+    return json({ ok: true, received: workouts.length, tennis: ops.length, applied: res.applied, created: res.created,
+      first: dates[0] || null, last: dates[dates.length - 1] || null }, 200);
   }
 
   // GET /api/log -> everything
@@ -75,8 +77,8 @@ export async function handleApi(request, env) {
       const err = checkOp(o);
       if (err) return json({ error: err }, 400);
     }
-    const applied = await store.apply(ops);
-    return json({ ok: true, applied }, 200);
+    const res = await store.apply(ops);
+    return json({ ok: true, applied: res.applied }, 200);
   }
 
   // PUT / DELETE /api/log/<col>/<id>  (single-document form, kept for older cached pages)
@@ -232,7 +234,7 @@ export class LogStore extends DurableObject {
   // than the stored copy is skipped, so a stale offline queue can't roll back
   // newer edits made on another device.
   apply(ops) {
-    let applied = 0;
+    let applied = 0, created = 0;
     this.ctx.storage.transactionSync(() => {
       for (const o of ops) {
         if (o.op === "delete") {
@@ -243,6 +245,7 @@ export class LogStore extends DurableObject {
         const incoming = typeof o.body.updatedAt === "string" ? o.body.updatedAt : null;
         const cur = this.sql.exec(`SELECT updated_at FROM docs WHERE col = ? AND id = ?`, o.col, o.id).toArray()[0];
         if (cur && cur.updated_at && incoming && incoming < cur.updated_at) continue;
+        if (!cur) created++;
         this.sql.exec(
           `INSERT OR REPLACE INTO docs (col, id, body, updated_at) VALUES (?, ?, ?, ?)`,
           o.col, o.id, JSON.stringify(o.body), incoming,
@@ -250,7 +253,7 @@ export class LogStore extends DurableObject {
         applied++;
       }
     });
-    return applied;
+    return { applied, created };
   }
 }
 

@@ -433,14 +433,17 @@ async function importHealthFile(file){
   const keep=["id","name","start","end","duration","activeEnergyBurned","totalEnergy","avgHeartRate","maxHeartRate","heartRate","heartRateData","distance","stepCount","temperature","humidity","activities"];
   const tennis=all.filter(w=>w&&(/tennis/i.test(w.name||"")||(w.activities||[]).some(a=>/tennis/i.test((a&&a.activityType)||""))))
     .map(w=>{const o={};keep.forEach(k=>{if(w[k]!==undefined)o[k]=w[k]});if(Array.isArray(o.activities))o.activities=o.activities.map(a=>({activityType:a.activityType}));return o});
-  if(!tennis.length){msg.textContent=all.length?"No tennis sessions in that file.":"No workouts in that file. Include Workouts when exporting.";return}
-  let done=0;
+  const span=list=>{const d=list.map(w=>String(w.start||"").slice(0,10)).filter(Boolean).sort();return d.length?`${fmtShort(d[0])} – ${fmtShort(d[d.length-1])}`:""};
+  const found=`Found ${all.length} workout${all.length===1?"":"s"}${all.length?" ("+span(all)+")":""}`;
+  if(!tennis.length){msg.textContent=all.length?`${found}, but none were tennis.`:"No workouts in that file. Include Workouts when exporting.";return}
+  let saved=0,created=0;
   try{
     for(let i=0;i<tennis.length;i+=10){
       msg.textContent=`Importing ${Math.min(i+10,tennis.length)} of ${tennis.length}…`;
-      const r=await api("POST","/ingest",{data:{workouts:tennis.slice(i,i+10)}});done+=r.tennis||0;
+      const r=await api("POST","/ingest",{data:{workouts:tennis.slice(i,i+10)}});saved+=r.tennis||0;created+=r.created||0;
     }
-    msg.textContent=`Imported ${done} tennis session${done===1?"":"s"}.`;
+    const n=tennis.length,skipped=n-saved;
+    msg.textContent=`${found}. ${n} tennis: ${created} new, ${saved-created} already here`+(skipped?`, ${skipped} unreadable`:"")+".";
     await refresh();
   }catch(e){
     msg.textContent=e.kind==="signin"?"Sign in again, then retry the import.":e.kind==="offline"?"You're offline. Try again with a connection.":"Import failed. Try a smaller date range.";
