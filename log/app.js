@@ -312,9 +312,11 @@ function render(){
 }
 /* ---------- Play: tennis sessions from Apple Health ---------- */
 const ZONES=[{n:"Z1",lo:0,hi:.6,label:"Easy"},{n:"Z2",lo:.6,hi:.7,label:"Steady"},{n:"Z3",lo:.7,hi:.8,label:"Moderate"},{n:"Z4",lo:.8,hi:.9,label:"Hard"},{n:"Z5",lo:.9,hi:9,label:"Max"}];
-const AGE_MAX_HR=183; // 220 − 37
+// Max heart rate, fixed at the peak recorded on 7 Oct 2026 (sustained 192–196 bpm, so not a sensor glitch).
+// It falls by about 1 bpm a year: review it every year or two.
+const MAX_HR=196;
 function playSorted(){return Object.values(S.play||{}).filter(p=>p&&p.date).sort((a,b)=>(a.start||a.date)<(b.start||b.date)?1:-1)}
-function hrMax(){return Math.max(AGE_MAX_HR,...playSorted().map(p=>p.maxHr||0))}
+function hrMax(){return MAX_HR}
 function zoneMinutes(p,max){
   const z=[0,0,0,0,0];if(!Array.isArray(p.hr))return null;
   for(const v of p.hr){if(v==null)continue;const r=v/max;const i=ZONES.findIndex(Z=>r>=Z.lo&&r<Z.hi);z[i<0?4:i]++}
@@ -415,7 +417,7 @@ function renderPlay(){
     list.slice(0,playShown).forEach(p=>sec.append(playCard(p,max)));
     m.append(sec);
     if(list.length>playShown)m.append(el("button",{type:"button",class:"btn",onclick:()=>{playShown+=8;renderPlay()}},`Show older sessions (${list.length-playShown})`));
-    m.append(el("p",{class:"hint"},`Heart-rate zones use your highest recorded heart rate, ${max} bpm.`));
+    m.append(el("p",{class:"hint"},`Heart-rate zones use a max heart rate of ${max} bpm.`));
   }
 
   const last=list.reduce((a,p)=>p.updatedAt&&p.updatedAt>a?p.updatedAt:a,"");
