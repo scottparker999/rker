@@ -170,3 +170,11 @@ rect.band{opacity:.22} rect.band.z1{fill:var(--z1)} rect.band.z2{fill:var(--z2)}
 .notice b{font-weight:600}
 @media (max-width:360px){.pstats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .stack{display:grid;gap:14px}
+.how ol,.how ul{margin:8px 0 0;padding-left:1.3em;display:grid;gap:6px;color:var(--ink);max-width:62ch}
+.how li{padding-left:2px}
+.how .how-sub{margin:12px 0 0;font-weight:600;color:var(--ink)}
+.how .how-feel{margin:10px 0 0}
+.how .how-avoid{margin:10px 0 0;color:var(--warn)}
+.how .how-avoid+ul{margin-top:4px}
+.how b{color:var(--ink);font-weight:600}
+.how .how-avoid b{color:var(--warn)}
