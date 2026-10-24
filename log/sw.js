@@ -1,10 +1,10 @@
 // Tennis Fitness Tracker service worker: keeps the app shell available offline.
 // Bump VERSION whenever app.css, app.js or the fonts change.
-const VERSION = "tft-v5";
+const VERSION = "tft-v6";
 const SHELL = [
   "/log/",
-  "/log/app.css?v=5",
-  "/log/app.js?v=5",
+  "/log/app.css?v=6",
+  "/log/app.js?v=6",
   "/log/fonts/barlow-condensed-latin-600-normal.woff2",
   "/log/fonts/barlow-condensed-latin-700-normal.woff2",
   "/log/fonts/ibm-plex-sans-latin-400-normal.woff2",
