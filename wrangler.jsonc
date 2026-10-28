@@ -14,6 +14,9 @@
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["LogStore"] }
   ],
+  // Gym-day reminders: every day at 22:00 UTC (8am Brisbane); the Worker only
+  // sends on training days.
+  "triggers": { "crons": ["0 22 * * *"] },
   "vars": {
     // Zero Trust team name: the part before .cloudflareaccess.com
     "ACCESS_TEAM": "misty-brook-383f",

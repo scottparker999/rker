@@ -7,29 +7,29 @@
   "scope": "/log/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#EEF1F4",
+  "background_color": "#14202B",
   "theme_color": "#FFFFFF",
   "icons": [
     {
-      "src": "/pwa/tennis-fitness/icon-192.png",
+      "src": "/pwa/tennis-fitness/icon-192.png?v=2",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/pwa/tennis-fitness/icon-512.png",
+      "src": "/pwa/tennis-fitness/icon-512.png?v=2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/pwa/tennis-fitness/icon-512.png",
+      "src": "/pwa/tennis-fitness/icon-512.png?v=2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/pwa/tennis-fitness/icon.svg",
+      "src": "/pwa/tennis-fitness/icon.svg?v=2",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
@@ -42,7 +42,7 @@
       "url": "/log/#train",
       "icons": [
         {
-          "src": "/pwa/tennis-fitness/icon-192.png",
+          "src": "/pwa/tennis-fitness/icon-192.png?v=2",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -54,7 +54,7 @@
       "url": "/log/#play",
       "icons": [
         {
-          "src": "/pwa/tennis-fitness/icon-192.png",
+          "src": "/pwa/tennis-fitness/icon-192.png?v=2",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -66,7 +66,7 @@
       "url": "/log/#body",
       "icons": [
         {
-          "src": "/pwa/tennis-fitness/icon-192.png",
+          "src": "/pwa/tennis-fitness/icon-192.png?v=2",
           "sizes": "192x192",
           "type": "image/png"
         }

@@ -1,10 +1,10 @@
 // Tennis Fitness Tracker service worker: keeps the app shell available offline.
 // Bump VERSION whenever app.css, app.js or the fonts change.
-const VERSION = "tft-v11";
+const VERSION = "tft-v12";
 const SHELL = [
   "/log/",
-  "/log/app.css?v=11",
-  "/log/app.js?v=11",
+  "/log/app.css?v=12",
+  "/log/app.js?v=12",
   "/log/fonts/barlow-condensed-latin-600-normal.woff2",
   "/log/fonts/barlow-condensed-latin-700-normal.woff2",
   "/log/fonts/ibm-plex-sans-latin-400-normal.woff2",
@@ -79,3 +79,24 @@ async function staleWhileRevalidate(event, req) {
   }
   return network;
 }
+
+// Gym-day reminders sent by the Worker (see worker/reminder.js).
+self.addEventListener("push", (event) => {
+  let m = { title: "Tennis Fitness", body: "", url: "/log/#train", tag: "gym-day" };
+  try { if (event.data) m = { ...m, ...event.data.json() }; } catch {}
+  const url = typeof m.url === "string" && m.url.startsWith("/log/") ? m.url : "/log/";
+  event.waitUntil(self.registration.showNotification(m.title, {
+    body: m.body, tag: m.tag, icon: "/pwa/tennis-fitness/icon-192.png?v=2", data: { url },
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/log/";
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const win = wins.find((w) => new URL(w.url).pathname.startsWith("/log/"));
+    if (win) { await win.focus(); if ("navigate" in win) await win.navigate(url).catch(() => {}); return; }
+    await self.clients.openWindow(url);
+  })());
+});

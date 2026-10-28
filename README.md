@@ -43,6 +43,10 @@ A private, installable training log. Cloudflare Access protects `/log` and
   workouts; tennis only). A service token may only call `ingest`.
 - **App:** `log/app.js` saves changes on the phone first and syncs them in
   batches; `log/sw.js` keeps the app shell available offline.
+- **Reminders:** a daily scheduled run (22:00 UTC = 8am Brisbane) sends a Web
+  Push notification on training days. `worker/push.js` does the VAPID signing
+  and message encryption with WebCrypto; the server's push key is created in
+  and never leaves the Durable Object. Tests: `node --test worker/*.test.mjs`.
 
 **When changing `log/app.js`, `log/app.css` or the fonts:** bump the `?v=`
 number in `log/index.html` and the matching `VERSION` and `?v=` entries in

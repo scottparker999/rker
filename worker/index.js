@@ -8,8 +8,13 @@
 //
 // Cloudflare Access sits in front of /log and /api/log; this Worker also verifies
 // the Access token itself, so the API stays locked even if Access is misconfigured.
+//
+// Gym-day reminders: a daily scheduled run (see "triggers" in wrangler.jsonc) sends a
+// Web Push notification at 8am Brisbane time on training days.
 
 import { DurableObject } from "cloudflare:workers";
+import { createVapidKeys, sendPush } from "./push.js";
+import { buildReminder } from "./reminder.js";
 
 const COLLECTIONS = ["sessions", "body", "play"];
 const MAX_INGEST = 32_000_000;
@@ -17,6 +22,10 @@ const ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 const MAX_BODY = 64_000;
 const MAX_OPS = 200;
 const MAX_BATCH = 512_000;
+const MAX_PLAN = 32_000;
+// Browsers' push services; a subscription must point at one of these.
+const PUSH_HOSTS = [/^web\.push\.apple\.com$/, /^fcm\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /\.notify\.windows\.com$/];
+const PUSH_SUBJECT = "https://rker.me";
 
 export default {
   async fetch(request, env) {
@@ -35,12 +44,52 @@ export default {
     }
     return handleApi(request, env);
   },
+
+  // runs daily at 22:00 UTC = 8am Brisbane; only sends on training days
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(sendReminders(env, { force: false }));
+  },
 };
+
+const storeOf = (env) => env.STORE.get(env.STORE.idFromName("main"));
+
+export async function sendReminders(env, { force }) {
+  const store = storeOf(env);
+  const [data, plan, subs, vapid] = await Promise.all([store.all(), store.getPlan(), store.listSubs(), store.vapid()]);
+  if (!subs.length) return { sent: 0, reason: "no subscriptions" };
+  const msg = buildReminder(data, plan, Date.now(), { force });
+  if (!msg) return { sent: 0, reason: "not a training day, or already trained" };
+  let sent = 0;
+  for (const sub of subs) {
+    try {
+      const r = await sendPush(sub, msg, vapid, PUSH_SUBJECT);
+      if (r.ok) sent++;
+      else if (r.gone) await store.removeSub(sub.endpoint);
+    } catch {}
+  }
+  return { sent, title: msg.title };
+}
+
+function validSubscription(sub, env) {
+  if (!sub || typeof sub !== "object" || typeof sub.endpoint !== "string" || sub.endpoint.length > 1000) return false;
+  if (!sub.keys || typeof sub.keys.p256dh !== "string" || typeof sub.keys.auth !== "string") return false;
+  if (!/^[A-Za-z0-9_-]{80,100}$/.test(sub.keys.p256dh) || !/^[A-Za-z0-9_-]{16,32}$/.test(sub.keys.auth)) return false;
+  let u;
+  try { u = new URL(sub.endpoint); } catch { return false; }
+  if (env.PUSH_ALLOW_LOCAL === "1" && u.hostname === "127.0.0.1") return true; // local testing only
+  return u.protocol === "https:" && PUSH_HOSTS.some((re) => re.test(u.hostname));
+}
+
+function validPlan(plan) {
+  return plan && Array.isArray(plan.days) && plan.days.length <= 7 && JSON.stringify(plan).length <= MAX_PLAN &&
+    plan.days.every((d) => d && Number.isInteger(d.dow) && d.dow >= 0 && d.dow <= 6 && typeof d.key === "string" &&
+      typeof d.name === "string" && Array.isArray(d.ex));
+}
 
 export async function handleApi(request, env) {
   const url = new URL(request.url);
   const parts = url.pathname.replace(/^\/api\/log\/?/, "").split("/").filter(Boolean);
-  const store = env.STORE.get(env.STORE.idFromName("main"));
+  const store = storeOf(env);
   if (request.method === "POST" && !/^application\/json\b/i.test(request.headers.get("content-type") || "")) {
     return json({ error: "Expected application/json" }, 415);
   }
@@ -88,6 +137,37 @@ export async function handleApi(request, env) {
     }
     const res = await store.apply(ops);
     return json({ ok: true, applied: res.applied }, 200);
+  }
+
+  // Reminders: GET /api/log/push · POST /api/log/push/{subscribe,unsubscribe,plan,test}
+  if (parts[0] === "push") {
+    if (parts.length === 1 && request.method === "GET") {
+      return json({ publicKey: (await store.vapid()).publicKey, devices: (await store.listSubs()).length }, 200);
+    }
+    if (parts.length !== 2 || request.method !== "POST") return json({ error: "Not found" }, 404);
+    const raw = await request.text();
+    if (raw.length > MAX_PLAN + 4000) return json({ error: "Too large" }, 413);
+    let body;
+    try { body = JSON.parse(raw); } catch { return json({ error: "Invalid JSON" }, 400); }
+    if (parts[1] === "subscribe") {
+      if (!validSubscription(body.subscription, env)) return json({ error: "Bad subscription" }, 400);
+      if (body.plan != null && !validPlan(body.plan)) return json({ error: "Bad plan" }, 400);
+      await store.addSub(body.subscription);
+      if (body.plan) await store.setPlan(body.plan);
+      return json({ ok: true }, 200);
+    }
+    if (parts[1] === "unsubscribe") {
+      if (typeof body.endpoint !== "string") return json({ error: "Bad endpoint" }, 400);
+      await store.removeSub(body.endpoint);
+      return json({ ok: true }, 200);
+    }
+    if (parts[1] === "plan") {
+      if (!validPlan(body.plan)) return json({ error: "Bad plan" }, 400);
+      await store.setPlan(body.plan);
+      return json({ ok: true }, 200);
+    }
+    if (parts[1] === "test") return json(await sendReminders(env, { force: true }), 200);
+    return json({ error: "Not found" }, 404);
   }
 
   return json({ error: "Not found" }, 404);
@@ -184,7 +264,27 @@ export class LogStore extends DurableObject {
     this.sql.exec(`CREATE TABLE IF NOT EXISTS docs (
       col TEXT NOT NULL, id TEXT NOT NULL, body TEXT NOT NULL, updated_at TEXT,
       PRIMARY KEY (col, id))`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, sub TEXT NOT NULL, created TEXT)`);
   }
+
+  getMeta(k) { const r = this.sql.exec(`SELECT v FROM meta WHERE k = ?`, k).toArray()[0]; return r ? JSON.parse(r.v) : null; }
+  setMeta(k, v) { this.sql.exec(`INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)`, k, JSON.stringify(v)); }
+
+  // The server's push identity, created on first use and never leaving this storage.
+  async vapid() {
+    let v = this.getMeta("vapid");
+    if (!v) { v = await createVapidKeys(); this.setMeta("vapid", v); }
+    return v;
+  }
+  getPlan() { return this.getMeta("plan"); }
+  setPlan(plan) { this.setMeta("plan", plan); }
+  listSubs() { return this.sql.exec(`SELECT sub FROM push_subs`).toArray().map((r) => JSON.parse(r.sub)); }
+  addSub(sub) {
+    this.sql.exec(`INSERT OR REPLACE INTO push_subs (endpoint, sub, created) VALUES (?, ?, ?)`,
+      sub.endpoint, JSON.stringify({ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } }), new Date().toISOString());
+  }
+  removeSub(endpoint) { this.sql.exec(`DELETE FROM push_subs WHERE endpoint = ?`, endpoint); }
 
   all() {
     const out = { sessions: {}, body: {}, play: {} };

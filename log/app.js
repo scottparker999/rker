@@ -629,6 +629,7 @@ function renderProgress(){
   if(allExercises().some(e=>{const h=sessions.filter(s=>doneSets(s.entries[e.id]).length);return h.length&&atPlateLimit(e,h[h.length-1],EX[e.id].day)}))
     m.append(el("p",{class:"notice"},el("b",{},"Some lifts are at your plates' limit. "),"Keep progressing them with extra reps or a slower 3–4 second lowering, and consider more 2.5 kg plates so the weight can keep rising."));
 
+  m.append(el("section",{class:"panel",id:"reminders"}));drawRemind();
   m.append(el("section",{class:"panel"},el("h2",{},"Your data"),
     el("p",{class:"hint"},"Download a copy for your records or a spreadsheet."),
     el("div",{class:"row"},
@@ -860,6 +861,78 @@ async function importHealthFile(file){
   const f=$("#play-file");if(f)f.value="";
 }
 
+/* ---------- gym-day reminders (Web Push) ----------
+   The phone subscribes once; the Worker sends the 8am reminder on training days.
+   The plan is uploaded with the subscription so the reminder knows each day's lifts. */
+const planSnapshot=()=>({days:ORDER.map(k=>({dow:PLAN[k].dow,key:k,name:PLAN[k].name,mins:PLAN[k].mins,
+  ex:PLAN[k].ex.map(e=>({id:e.id,n:e.n,sets:e.sets,hi:e.hi,load:e.load}))}))});
+const DAY_NAMES=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const gymDays=()=>{const d=ORDER.map(k=>PLAN[k].dow).sort().map(i=>DAY_NAMES[i]);return d.slice(0,-1).join(", ")+" and "+d[d.length-1]};
+const isStandalone=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+const b64uBytes=s=>Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")+"===".slice((s.length+3)%4)),c=>c.charCodeAt(0));
+const Remind={state:"checking",msg:""}; // checking | unsupported | install | denied | off | on
+
+async function remindCheck(){
+  if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
+    Remind.state=/iPhone|iPad/.test(navigator.userAgent)&&!isStandalone()?"install":"unsupported";return drawRemind();
+  }
+  if(Notification.permission==="denied"){Remind.state="denied";return drawRemind()}
+  try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();Remind.state=sub?"on":"off"}
+  catch(e){Remind.state="off"}
+  drawRemind();
+  if(Remind.state==="on")syncPlan();
+}
+async function syncPlan(){
+  // re-upload the plan only when it has changed since the last upload
+  const json=JSON.stringify(planSnapshot());
+  if(lsGet("tft:plan-sent","")===json)return;
+  try{await api("POST","/push/plan",{plan:JSON.parse(json)});lsSet("tft:plan-sent",json)}catch(e){}
+}
+async function remindOn(){
+  // ask first, straight from the tap: iPhone only allows the prompt from a direct user action
+  const perm=await Notification.requestPermission();
+  if(perm!=="granted"){Remind.state=perm==="denied"?"denied":"off";Remind.msg=perm==="denied"?"":"Notifications weren't allowed.";return drawRemind()}
+  Remind.msg="Turning on…";drawRemind();
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const {publicKey}=await api("GET","/push");
+    const sub=await reg.pushManager.getSubscription()||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uBytes(publicKey)});
+    const plan=planSnapshot();
+    await api("POST","/push/subscribe",{subscription:sub.toJSON(),plan});
+    lsSet("tft:plan-sent",JSON.stringify(plan));
+    Remind.state="on";Remind.msg="On. Use “Send a test” to check it arrives.";
+  }catch(e){Remind.msg=e&&e.kind==="signin"?"Sign in again, then try once more.":e&&e.kind==="offline"?"You're offline. Try again with a connection.":"Couldn't turn reminders on. Try again in a moment."}
+  drawRemind();
+}
+async function remindOff(){
+  Remind.msg="Turning off…";drawRemind();
+  try{
+    const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
+    if(sub){await api("POST","/push/unsubscribe",{endpoint:sub.endpoint}).catch(()=>{});await sub.unsubscribe()}
+    Remind.state="off";Remind.msg="Reminders are off.";
+  }catch(e){Remind.msg="Couldn't turn reminders off. Try again in a moment."}
+  drawRemind();
+}
+async function remindTest(){
+  Remind.msg="Sending…";drawRemind();
+  try{const r=await api("POST","/push/test",{});Remind.msg=r.sent?"Sent. It should arrive within a few seconds.":"Nothing was sent: "+(r.reason||"no device is subscribed")+"."}
+  catch(e){Remind.msg="Couldn't send a test. Try again in a moment."}
+  drawRemind();
+}
+function drawRemind(){
+  const box=$("#reminders");if(!box)return;box.replaceChildren(el("h2",{},"Gym-day reminders"));
+  const st=Remind.state,line=t=>el("p",{class:"hint"},t);
+  if(st==="checking")box.append(line("Checking…"));
+  else if(st==="install")box.append(line("To get reminders on iPhone, add this app to your Home Screen (Share → Add to Home Screen) and open it from there."));
+  else if(st==="unsupported")box.append(line("This browser can't show notifications. Open the app from your Home Screen instead."));
+  else if(st==="denied")box.append(line(/iPhone|iPad/.test(navigator.userAgent)?"Notifications are blocked for this app. Turn them on in iPhone Settings → Notifications → Tennis Fitness, then come back here.":"Notifications are blocked for this site. Allow them in your browser's site settings, then reload."));
+  else if(st==="off")box.append(line(`A notification at 8am on ${gymDays()}, with that day's workout and which lifts are ready to go up.`),
+    el("div",{class:"row"},el("button",{type:"button",class:"btn primary",onclick:remindOn},"Turn on reminders")));
+  else box.append(line(`On: 8am on ${gymDays()}.`),
+    el("div",{class:"row"},el("button",{type:"button",class:"btn",onclick:remindTest},"Send a test"),el("button",{type:"button",class:"btn quiet",onclick:remindOff},"Turn off")));
+  if(Remind.msg)box.append(el("p",{class:"hint","aria-live":"polite"},Remind.msg));
+}
+
 /* ---------- tabs (also reachable as /log/#train, #play, #progress, #body) ---------- */
 const HASH_TAB={train:"log",play:"play",progress:"progress",body:"body"},TAB_HASH={log:"train",play:"play",progress:"progress",body:"body"};
 function setTab(t){S.tab=t;try{localStorage.setItem("tab",t)}catch(e){}
@@ -1058,4 +1131,4 @@ if("serviceWorker" in navigator){
   window.addEventListener("load",()=>{navigator.serviceWorker.register("/log/sw.js",{scope:"/log/"}).catch(()=>{})});
 }
 
-publish();showSync();render();refresh();
+publish();showSync();render();refresh();remindCheck();
