@@ -13,7 +13,7 @@ const PLAN = {
     {id:"ext-rot",st:"A",n:"Side-lying external rotation",sets:2,lo:15,hi:15,start:"Bare handle",unit:"per arm",rest:45,load:"kg"},
     {id:"floor-press",st:"B",n:"Dumbbell floor press",sets:4,lo:6,hi:8,start:"10–14 kg",unit:"per hand",rest:150,load:"kg"},
     {id:"oh-tri",st:"B",n:"Overhead tricep extension",sets:3,lo:8,hi:12,start:"One floor-press dumbbell",unit:"held in both hands",rest:75,load:"kg"},
-    {id:"ohp",st:"C",n:"Standing overhead press",sets:3,lo:8,hi:12,start:"6–10 kg",unit:"per hand",rest:90,load:"kg"},
+    {id:"ohp",st:"C",pair:"zottman",n:"Standing overhead press",sets:3,lo:8,hi:12,start:"6–10 kg",unit:"per hand",rest:90,load:"kg"},
     {id:"zottman",st:"C",n:"Zottman curls",sets:3,lo:8,hi:12,start:"Same as the press",unit:"per hand",rest:75,load:"kg"},
     {id:"lateral",st:"D",n:"Lateral raises",sets:3,lo:12,hi:15,start:"3–5 kg",unit:"per hand",rest:60,load:"kg"}
   ]},
@@ -25,7 +25,7 @@ const PLAN = {
     D:{kit:"one",kg:4.5,label:"Take one dumbbell down to light",note:"Keep the other at curl weight for palm-up wrist curls."}},
    ex:[
     {id:"rear-fly",st:"A",n:"Rear-delt flyes",sets:3,lo:12,hi:15,start:"3–5 kg",unit:"per hand",rest:60,load:"kg"},
-    {id:"bo-row",st:"B",n:"Bent-over row",sets:4,lo:6,hi:10,start:"10–14 kg",unit:"per hand",rest:120,load:"kg"},
+    {id:"bo-row",st:"B",pair:"cg-press",n:"Bent-over row",sets:4,lo:6,hi:10,start:"10–14 kg",unit:"per hand",rest:120,load:"kg"},
     {id:"cg-press",st:"B",n:"Close-grip floor press",sets:3,lo:8,hi:12,start:"Same as the row",unit:"per hand",rest:90,load:"kg"},
     {id:"pullup",st:"B",n:"Pull-ups or pullovers",sets:3,lo:null,hi:null,start:"Bodyweight / one row dumbbell",unit:"as many as possible",rest:120,load:"bw"},
     {id:"curl",st:"C",n:"Bicep curls",sets:3,lo:8,hi:12,start:"7–10 kg",unit:"per hand",rest:75,load:"kg"},
@@ -41,7 +41,7 @@ const PLAN = {
     {id:"diamond",st:"A",n:"Close-grip push-ups",sets:3,lo:null,hi:null,start:"Bodyweight",unit:"as many as possible",rest:90,load:"bw"},
     {id:"hammer",st:"B",n:"Hammer curls",sets:3,lo:8,hi:12,start:"8–10 kg",unit:"per hand",rest:60,load:"kg"},
     {id:"conc-curl",st:"B",n:"Concentration curls",sets:2,lo:8,hi:12,start:"One hammer-curl dumbbell",unit:"per arm",rest:45,load:"kg"},
-    {id:"skull",st:"C",n:"Floor skull crushers",sets:3,lo:10,hi:15,start:"5–8 kg",unit:"per hand",rest:60,load:"kg"},
+    {id:"skull",st:"C",pair:"woodchop",n:"Floor skull crushers",sets:3,lo:10,hi:15,start:"5–8 kg",unit:"per hand",rest:60,load:"kg"},
     {id:"woodchop",st:"C",n:"Dumbbell woodchop",sets:2,lo:10,hi:12,start:"One skull-crusher dumbbell",unit:"per side",rest:45,load:"kg"},
     {id:"rdl",st:"D",n:"Romanian deadlift",sets:3,lo:8,hi:10,start:"12–16 kg",unit:"per hand",rest:120,load:"kg"},
     {id:"split",st:"D",n:"Rear-foot-elevated split squat",sets:2,lo:10,hi:10,start:"Bodyweight, then the deadlift dumbbells",unit:"per leg",rest:75,load:"kg"},
@@ -433,6 +433,11 @@ function exCard(e,next){
       ready===true?el("span",{class:"chip up"},e.load==="kg"?"Add 2.5 kg":"Make it harder"):ready===false?el("span",{class:"chip hold"},"Same again"):null)
       :el("div",{class:"last"},"First time. Start at the low end and find your weight."),
   );
+  if(e.pair&&EX[e.pair]){
+    // optional time-saver: alternate with an exercise that uses different muscles at the same weight
+    card.append(el("details",{class:"tip"},el("summary",{},"Short on time?"),
+      el("p",{},`Alternate this with ${EX[e.pair].n.replace(/^(?!Zottman)./,c=>c.toLowerCase())}: one set of each, resting about 60 seconds between them, at the same weight. It saves 5–10 minutes and builds about the same muscle. When you have time, straight sets with full rest are still slightly better.`)));
+  }
   const sets=el("div",{class:"sets"});
   for(let i=0;i<e.sets;i++){
     const cur=entries[i]||{kg:null,reps:null,done:false};

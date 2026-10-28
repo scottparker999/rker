@@ -215,3 +215,9 @@ rect.band{opacity:.22} rect.band.z1{fill:var(--z1)} rect.band.z2{fill:var(--z2)}
 .pc-handle{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:.85rem;color:var(--muted)}
 .pc-handle .field{width:7.5rem}
 .daterow .btn.quiet{color:var(--accent);font-weight:500}
+.tip{font-size:.82rem;color:var(--muted)}
+.tip summary{cursor:pointer;color:var(--accent);font-weight:500;list-style:none;display:inline-block}
+.tip summary::-webkit-details-marker{display:none}
+.tip summary::before{content:"+ "}
+.tip[open] summary::before{content:"– "}
+.tip p{margin:6px 0 0;max-width:62ch;padding:8px 10px;border-radius:8px;background:var(--sunk);color:var(--ink)}
