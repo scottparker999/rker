@@ -1,30 +1,51 @@
 "use strict";
+/* Each day is ordered into weight "stations": exercises in a station use the same
+   dumbbell setup, so you only reload between stations. kg = default per-dumbbell
+   weight (assuming a 2 kg handle) until you've logged the station's first exercise. */
 const PLAN = {
-  push:{name:"Push + arms",sub:"Tuesday",dow:2,mins:45,ex:[
-    {id:"floor-press",n:"Dumbbell floor press",sets:4,lo:6,hi:8,start:"10–14 kg",unit:"per hand",rest:150,load:"kg"},
-    {id:"ohp",n:"Standing overhead press",sets:3,lo:8,hi:8,start:"6–10 kg",unit:"per hand",rest:90,load:"kg"},
-    {id:"lateral",n:"Lateral raises",sets:3,lo:12,hi:15,start:"3–5 kg",unit:"per hand",rest:60,load:"kg"},
-    {id:"oh-tri",n:"Overhead tricep extension",sets:3,lo:10,hi:12,start:"8–12 kg",unit:"one dumbbell",rest:75,load:"kg"},
-    {id:"zottman",n:"Zottman curls",sets:3,lo:10,hi:12,start:"5–8 kg",unit:"per hand",rest:75,load:"kg"},
-    {id:"ext-rot",n:"Side-lying external rotation",sets:2,lo:15,hi:15,start:"1–3 kg",unit:"per arm",rest:45,load:"kg"}
+  push:{name:"Push + arms",sub:"Tuesday",dow:2,mins:45,
+   stations:{
+    A:{kit:"one",kg:2,label:"One bare handle",note:"Warm-up for the shoulder."},
+    B:{kit:"pair",kg:12,label:"Both dumbbells heavy",note:"Floor press, then use one of them for the triceps extension."},
+    C:{kit:"pair",kg:7,label:"Both dumbbells medium",note:"Press and curls share this weight."},
+    D:{kit:"pair",kg:4.5,label:"Both dumbbells light"}},
+   ex:[
+    {id:"ext-rot",st:"A",n:"Side-lying external rotation",sets:2,lo:15,hi:15,start:"Bare handle",unit:"per arm",rest:45,load:"kg"},
+    {id:"floor-press",st:"B",n:"Dumbbell floor press",sets:4,lo:6,hi:8,start:"10–14 kg",unit:"per hand",rest:150,load:"kg"},
+    {id:"oh-tri",st:"B",n:"Overhead tricep extension",sets:3,lo:8,hi:12,start:"One floor-press dumbbell",unit:"held in both hands",rest:75,load:"kg"},
+    {id:"ohp",st:"C",n:"Standing overhead press",sets:3,lo:8,hi:12,start:"6–10 kg",unit:"per hand",rest:90,load:"kg"},
+    {id:"zottman",st:"C",n:"Zottman curls",sets:3,lo:8,hi:12,start:"Same as the press",unit:"per hand",rest:75,load:"kg"},
+    {id:"lateral",st:"D",n:"Lateral raises",sets:3,lo:12,hi:15,start:"3–5 kg",unit:"per hand",rest:60,load:"kg"}
   ]},
-  pull:{name:"Pull + arms",sub:"Thursday",dow:4,mins:50,ex:[
-    {id:"bo-row",n:"Bent-over row",sets:4,lo:6,hi:8,start:"10–14 kg",unit:"per hand",rest:120,load:"kg"},
-    {id:"pullup",n:"Pull-ups or pullovers",sets:3,lo:null,hi:null,start:"Bodyweight / 8–12 kg",unit:"as many as possible",rest:120,load:"bw"},
-    {id:"curl",n:"Bicep curls",sets:3,lo:8,hi:10,start:"7–10 kg",unit:"per hand",rest:75,load:"kg"},
-    {id:"cg-press",n:"Close-grip floor press",sets:3,lo:8,hi:10,start:"10–14 kg",unit:"per hand",rest:90,load:"kg"},
-    {id:"rear-fly",n:"Rear-delt flyes",sets:3,lo:12,hi:15,start:"3–5 kg",unit:"per hand",rest:60,load:"kg"},
-    {id:"wrist",n:"Wrist curls + reverse",sets:2,lo:15,hi:15,start:"4–7 kg / 2–4 kg",unit:"palm up / palm down",rest:45,load:"kg"}
+  pull:{name:"Pull + arms",sub:"Thursday",dow:4,mins:50,
+   stations:{
+    A:{kit:"pair",kg:4.5,label:"Both dumbbells light",note:"Warm-up for the upper back."},
+    B:{kit:"pair",kg:12,label:"Both dumbbells heavy",note:"Rows, close-grip press and pullovers all use this weight."},
+    C:{kit:"pair",kg:7,label:"Both dumbbells medium"},
+    D:{kit:"one",kg:4.5,label:"Take one dumbbell down to light",note:"Keep the other at curl weight for palm-up wrist curls."}},
+   ex:[
+    {id:"rear-fly",st:"A",n:"Rear-delt flyes",sets:3,lo:12,hi:15,start:"3–5 kg",unit:"per hand",rest:60,load:"kg"},
+    {id:"bo-row",st:"B",n:"Bent-over row",sets:4,lo:6,hi:10,start:"10–14 kg",unit:"per hand",rest:120,load:"kg"},
+    {id:"cg-press",st:"B",n:"Close-grip floor press",sets:3,lo:8,hi:12,start:"Same as the row",unit:"per hand",rest:90,load:"kg"},
+    {id:"pullup",st:"B",n:"Pull-ups or pullovers",sets:3,lo:null,hi:null,start:"Bodyweight / one row dumbbell",unit:"as many as possible",rest:120,load:"bw"},
+    {id:"curl",st:"C",n:"Bicep curls",sets:3,lo:8,hi:12,start:"7–10 kg",unit:"per hand",rest:75,load:"kg"},
+    {id:"wrist",st:"D",n:"Wrist curls + reverse",sets:2,lo:15,hi:15,start:"Curl dumbbell / light dumbbell",unit:"palm up / palm down",rest:45,load:"kg"}
   ]},
-  upper:{name:"Arms + legs",sub:"Saturday",dow:6,mins:55,ex:[
-    {id:"diamond",n:"Close-grip push-ups",sets:3,lo:null,hi:null,start:"Bodyweight",unit:"as many as possible",rest:90,load:"bw"},
-    {id:"hammer",n:"Hammer curls",sets:3,lo:10,hi:12,start:"8–10 kg",unit:"per hand",rest:60,load:"kg"},
-    {id:"skull",n:"Floor skull crushers",sets:3,lo:10,hi:12,start:"5–8 kg",unit:"per hand",rest:60,load:"kg"},
-    {id:"conc-curl",n:"Concentration curls",sets:2,lo:12,hi:12,start:"6–9 kg",unit:"per arm",rest:45,load:"kg"},
-    {id:"woodchop",n:"Dumbbell woodchop",sets:2,lo:10,hi:10,start:"4–6 kg",unit:"one dumbbell, per side",rest:45,load:"kg"},
-    {id:"rdl",n:"Romanian deadlift",sets:3,lo:8,hi:8,start:"12–16 kg",unit:"per hand",rest:120,load:"kg"},
-    {id:"split",n:"Rear-foot-elevated split squat",sets:2,lo:10,hi:10,start:"Bodyweight → 4–8 kg",unit:"per leg",rest:75,load:"kg"},
-    {id:"calf",n:"Single-leg calf raises",sets:2,lo:15,hi:15,start:"Bodyweight → 8–12 kg",unit:"per leg",rest:45,load:"kg"}
+  upper:{name:"Arms + legs",sub:"Saturday",dow:6,mins:55,
+   stations:{
+    A:{kit:"none",label:"No weights",note:"Load the dumbbells for hammer curls while you rest."},
+    B:{kit:"pair",kg:7,label:"Both dumbbells medium",note:"Hammer curls, then one of them for concentration curls."},
+    C:{kit:"pair",kg:4.5,label:"Both dumbbells light",note:"Skull crushers, then one of them for woodchops."},
+    D:{kit:"pair",kg:14.5,label:"Both dumbbells heavy",note:"Deadlifts, split squats and calf raises."}},
+   ex:[
+    {id:"diamond",st:"A",n:"Close-grip push-ups",sets:3,lo:null,hi:null,start:"Bodyweight",unit:"as many as possible",rest:90,load:"bw"},
+    {id:"hammer",st:"B",n:"Hammer curls",sets:3,lo:8,hi:12,start:"8–10 kg",unit:"per hand",rest:60,load:"kg"},
+    {id:"conc-curl",st:"B",n:"Concentration curls",sets:2,lo:8,hi:12,start:"One hammer-curl dumbbell",unit:"per arm",rest:45,load:"kg"},
+    {id:"skull",st:"C",n:"Floor skull crushers",sets:3,lo:10,hi:15,start:"5–8 kg",unit:"per hand",rest:60,load:"kg"},
+    {id:"woodchop",st:"C",n:"Dumbbell woodchop",sets:2,lo:10,hi:12,start:"One skull-crusher dumbbell",unit:"per side",rest:45,load:"kg"},
+    {id:"rdl",st:"D",n:"Romanian deadlift",sets:3,lo:8,hi:10,start:"12–16 kg",unit:"per hand",rest:120,load:"kg"},
+    {id:"split",st:"D",n:"Rear-foot-elevated split squat",sets:2,lo:10,hi:10,start:"Bodyweight, then the deadlift dumbbells",unit:"per leg",rest:75,load:"kg"},
+    {id:"calf",st:"D",n:"Single-leg calf raises",sets:2,lo:15,hi:15,start:"Bodyweight, then one deadlift dumbbell",unit:"per leg",rest:45,load:"kg"}
   ]}
 };
 /* ---------- exercise instructions (shown under "How to do it") ----------
@@ -190,6 +211,101 @@ function howBlock(e){
   return det;
 }
 
+/* ---------- dumbbell plates ----------
+   Kit: two spin-lock handles, 8 × 2.5 kg and 8 × 1.25 kg plates. Plates go on in
+   matching pairs (same on each side). Loading both dumbbells the same means each
+   dumbbell can take at most 2 of each plate per side; one dumbbell can take 4. */
+const PLATES={big:2.5,small:1.25,count:8};
+function handleKg(){try{const v=parseFloat(localStorage.getItem("tft:handle"));return v>0&&v<10?v:2}catch(e){return 2}}
+function setHandleKg(v){try{localStorage.setItem("tft:handle",String(v))}catch(e){}}
+const perSideMax=kit=>kit==="one"?PLATES.count/2:PLATES.count/4;
+function loadKg(l){return handleKg()+2*(l.big*PLATES.big+l.small*PLATES.small)}
+// best loading for a target weight per dumbbell: closest, then fewest plates
+function bestLoad(target,kit){
+  const m=perSideMax(kit);let best=null;
+  for(let b=0;b<=m;b++)for(let s=0;s<=m;s++){
+    const l={big:b,small:s},kg=loadKg(l),d=Math.abs(kg-target),n=b+s;
+    if(!best||d<best.d-1e-9||(Math.abs(d-best.d)<1e-9&&n<best.n))best={...l,kg,d,n};
+  }
+  return {big:best.big,small:best.small};
+}
+function reachable(kit){
+  const m=perSideMax(kit),set=new Set();
+  for(let b=0;b<=m;b++)for(let s=0;s<=m;s++)set.add(Math.round(loadKg({big:b,small:s})*100)/100);
+  return [...set].sort((a,b)=>a-b);
+}
+const sideText=l=>{const p=[];for(let i=0;i<l.big;i++)p.push("2.5");for(let i=0;i<l.small;i++)p.push("1.25");return p.length?p.join(" + ")+" each side":"no plates"};
+
+function dumbbellSVG(l){
+  const ns="http://www.w3.org/2000/svg",W=320,H=96,cx=W/2;
+  const mk=(t,a)=>{const e=document.createElementNS(ns,t);for(const k in a)e.setAttribute(k,a[k]);return e};
+  const s=mk("svg",{viewBox:`0 0 ${W} ${H}`,class:"dbsvg",role:"img","aria-label":`Dumbbell loaded with ${sideText(l)}`});
+  const grip=64,bigW=14,smallW=10,gap=2;
+  s.append(mk("rect",{x:20,y:H/2-4,width:W-40,height:8,rx:3,class:"db-bar"}));
+  s.append(mk("rect",{x:cx-grip/2,y:H/2-6,width:grip,height:12,rx:4,class:"db-grip"}));
+  [-1,1].forEach(dir=>{
+    let x=cx+dir*(grip/2+6);
+    s.append(mk("rect",{x:dir<0?x-4:x,y:H/2-11,width:4,height:22,rx:1,class:"db-collar"}));x+=dir*6;
+    const plates=[...Array(l.big).fill("big"),...Array(l.small).fill("small")];
+    plates.forEach(p=>{const w=p==="big"?bigW:smallW,h=p==="big"?80:60;
+      s.append(mk("rect",{x:dir<0?x-w:x,y:(H-h)/2,width:w,height:h,rx:3,class:"db-plate "+p}));x+=dir*(w+gap)});
+    s.append(mk("rect",{x:dir<0?x-6:x,y:H/2-9,width:6,height:18,rx:2,class:"db-nut"}));
+  });
+  return s;
+}
+
+/* the calculator sheet: one loading, edited either by target weight or plate by plate */
+const Calc={kit:"pair",l:{big:0,small:0}};
+function openCalc(kg,kit){
+  Calc.kit=kit==="one"?"one":"pair";
+  Calc.l=kg!=null?bestLoad(kg,Calc.kit):{big:0,small:0};
+  renderCalc();const d=$("#calc");if(!d.open){try{d.showModal()}catch(e){d.setAttribute("open","")}}
+}
+function renderCalc(){
+  const box=$("#calc-body");box.replaceChildren();
+  const m=perSideMax(Calc.kit);Calc.l.big=Math.min(Calc.l.big,m);Calc.l.small=Math.min(Calc.l.small,m);
+  const kg=loadKg(Calc.l),opts=reachable(Calc.kit);
+  const step=dir=>{const i=opts.findIndex(v=>v>=kg-1e-9);const j=Math.max(0,Math.min(opts.length-1,i+dir));Calc.l=bestLoad(opts[j],Calc.kit);renderCalc()};
+  const counter=(key,label)=>el("div",{class:"pc-row"},
+    el("span",{class:"pc-lbl"},el("i",{class:"pc-swatch "+key}),label),
+    el("button",{type:"button",class:"pc-btn","aria-label":"Remove a "+label+" plate from each side",disabled:Calc.l[key]===0||null,onclick:()=>{Calc.l[key]--;renderCalc()}},"−"),
+    el("b",{class:"num pc-n"},String(Calc.l[key])),
+    el("button",{type:"button",class:"pc-btn","aria-label":"Add a "+label+" plate to each side",disabled:Calc.l[key]>=m||null,onclick:()=>{Calc.l[key]++;renderCalc()}},"+"));
+  const used=k=>Calc.l[k]*2*(Calc.kit==="pair"?2:1);
+  box.append(
+    el("div",{class:"seg",role:"group","aria-label":"Dumbbells"},
+      ["pair","one"].map(k=>el("button",{type:"button","aria-pressed":String(Calc.kit===k),onclick:()=>{Calc.kit=k;Calc.l=bestLoad(kg,k);renderCalc()}},k==="pair"?"Both dumbbells":"One dumbbell"))),
+    el("div",{class:"pc-target"},
+      el("button",{type:"button",class:"pc-big","aria-label":"Lighter",disabled:kg<=opts[0]+1e-9||null,onclick:()=>step(-1)},"−"),
+      el("div",{class:"pc-kg"},el("b",{class:"num"},fmtKg(kg)),el("span",{}," kg per dumbbell")),
+      el("button",{type:"button",class:"pc-big","aria-label":"Heavier",disabled:kg>=opts[opts.length-1]-1e-9||null,onclick:()=>step(1)},"+")),
+    dumbbellSVG(Calc.l),
+    el("p",{class:"pc-recipe"},el("b",{},"Load: "),sideText(Calc.l)+(Calc.kit==="pair"?", on both dumbbells":"")),
+    el("div",{class:"pc-counters"},counter("big","2.5 kg"),counter("small","1.25 kg")),
+    el("p",{class:"hint"},`Using ${used("big")} of 8 × 2.5 kg and ${used("small")} of 8 × 1.25 kg plates.`+(Calc.kit==="pair"?` Pair total ${fmtKg(kg*2)} kg.`:"")),
+    el("label",{class:"pc-handle",for:"calc-handle"},"Handle weight",
+      el("div",{class:"field"},el("input",{type:"number",id:"calc-handle",inputmode:"decimal",step:"0.05",min:"0.5",max:"9",value:handleKg(),
+        onchange:e=>{const v=parseFloat(e.target.value);if(v>0&&v<10){setHandleKg(v);e.target.blur();requestAnimationFrame(()=>{renderCalc();if(S.tab==="log")renderLog()})}}}),el("i",{},"kg"))));
+}
+function stationKg(day,stId){
+  // the weight you last used for the station's first weighted exercise, else the plan default
+  const st=PLAN[day].stations[stId];if(!st||st.kit==="none")return null;
+  const lead=PLAN[day].ex.find(e=>e.st===stId&&e.load==="kg");
+  const last=lead&&lastFor(lead.id,S.date,sid());
+  const kgs=last?doneSets(last.entries[lead.id]).map(s=>s.kg).filter(v=>v!=null):[];
+  const target=kgs.length?Math.max(...kgs):st.kg;
+  return loadKg(bestLoad(target,st.kit==="one"?"one":"pair"));
+}
+function stationHeader(day,stId,first){
+  const st=PLAN[day].stations[stId];
+  if(st.kit==="none")return el("div",{class:"station"},el("span",{class:"st-tag"},first?"Start":"Change"),el("div",{class:"st-main"},el("b",{},st.label),st.note?el("span",{},st.note):null));
+  const kg=stationKg(day,stId),kit=st.kit==="one"?"one":"pair",l=bestLoad(kg,kit);
+  return el("div",{class:"station"},
+    el("span",{class:"st-tag"},first?"Start":"Change"),
+    el("div",{class:"st-main"},el("b",{},`${st.label} · ${fmtKg(kg)} kg`),el("span",{},(s=>s[0].toUpperCase()+s.slice(1))(sideText(l))+"."+(st.note?" "+st.note:""))),
+    el("button",{type:"button",class:"btn st-btn",onclick:()=>openCalc(kg,kit)},"Plates"));
+}
+
 const ORDER = ["push","pull","upper"];
 const EX = {}; ORDER.forEach(d=>PLAN[d].ex.forEach(e=>EX[e.id]={...e,day:d}));
 
@@ -265,6 +381,8 @@ function tick(){
   if(left<=0&&!t.beeped){t.beeped=true;beep()}
   clearTimeout(t.h);t.h=setTimeout(tick,250);
 }
+$("#calc-close").onclick=()=>$("#calc").close();
+$("#calc").addEventListener("click",e=>{if(e.target===$("#calc"))$("#calc").close()});
 $("#timer-add").onclick=()=>{if(S.timer){S.timer.end+=15000;S.timer.total+=15;S.timer.beeped=false;tick()}};
 $("#timer-skip").onclick=()=>{if(S.timer)clearTimeout(S.timer.h);S.timer=null;$("#timer").hidden=true};
 
@@ -280,9 +398,10 @@ function renderLog(){
   const p=PLAN[S.day];
   m.append(el("div",{class:"daterow"},
     el("label",{for:"sess-date"},"Session date ",el("input",{type:"date",id:"sess-date",value:S.date,max:iso(new Date()),onchange:e=>{if(e.target.value){saveNow();S.date=e.target.value;S.autoDate=S.date===iso(new Date());loadDraft();renderLog()}}})),
-    el("span",{},S.sessions[sid()]?"Logged · edits save automatically":"Ticks save automatically")
+    el("span",{},S.sessions[sid()]?"Logged · edits save automatically":"Ticks save automatically"),
+    el("button",{type:"button",class:"btn quiet",onclick:()=>openCalc(null,"pair")},"Plate calculator")
   ));
-  p.ex.forEach((e,idx)=>m.append(exCard(e,p.ex[idx+1])));
+  p.ex.forEach((e,idx)=>{if(!idx||p.ex[idx-1].st!==e.st)m.append(stationHeader(S.day,e.st,!idx));m.append(exCard(e,p.ex[idx+1]))});
   // footer actions
   const exists=!!S.sessions[sid()];
   if(exists){
@@ -311,14 +430,15 @@ function exCard(e,next){
     el("div",{class:"ex-top"},el("h2",{},e.n),el("span",{class:"target"},target)),
     el("div",{class:"specs"},el("span",{},"Start ",el("b",{},e.start)," ",e.unit),el("span",{},"Rest ",el("b",{},e.rest>=120?Math.floor(e.rest/60)+(e.rest%60?":"+String(e.rest%60).padStart(2,"0"):"")+" min":e.rest+" s"))),
     last?el("div",{class:"last"},el("span",{class:"num"},fmtShort(last.date)+": "+lastTxt),
-      ready===true?el("span",{class:"chip up"},e.load==="kg"?"Add 1–2 kg":"Make it harder"):ready===false?el("span",{class:"chip hold"},"Same again"):null)
+      ready===true?el("span",{class:"chip up"},e.load==="kg"?"Add 2.5 kg":"Make it harder"):ready===false?el("span",{class:"chip hold"},"Same again"):null)
       :el("div",{class:"last"},"First time. Start at the low end and find your weight."),
   );
   const sets=el("div",{class:"sets"});
   for(let i=0;i<e.sets;i++){
     const cur=entries[i]||{kg:null,reps:null,done:false};
     const prev=lastSets[i]||lastSets[lastSets.length-1]||null;
-    const kgPh=prev&&prev.kg!=null?fmtKg(prev.kg):(e.load==="kg"?"":"–");
+    const stKg=e.load==="kg"&&e.st?stationKg(S.day,e.st):null;
+    const kgPh=prev&&prev.kg!=null?fmtKg(prev.kg):(e.load==="kg"?(stKg!=null?fmtKg(stKg):""):"–");
     const repPh=prev&&prev.reps!=null?String(prev.reps):(e.hi==null?"":String(e.hi));
     const row=el("div",{class:"set"+(cur.done?" done":"")});
     const kgIn=el("input",{type:"number",inputmode:"decimal",step:"0.5",min:"0",id:`kg-${e.id}-${i}`,"aria-label":`${e.n} set ${i+1} kilograms`,placeholder:kgPh,value:cur.kg??""});
