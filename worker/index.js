@@ -16,6 +16,7 @@ const MAX_INGEST = 32_000_000;
 const ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 const MAX_BODY = 64_000;
 const MAX_OPS = 200;
+const MAX_BATCH = 512_000;
 
 export default {
   async fetch(request, env) {
@@ -76,7 +77,7 @@ export async function handleApi(request, env) {
   if (parts.length === 1 && parts[0] === "batch") {
     if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
     const raw = await request.text();
-    if (raw.length > MAX_BODY * 8) return json({ error: "Too large" }, 413);
+    if (raw.length > MAX_BATCH) return json({ error: "Too large" }, 413);
     let payload;
     try { payload = JSON.parse(raw); } catch { return json({ error: "Invalid JSON" }, 400); }
     const ops = payload && Array.isArray(payload.ops) ? payload.ops : null;
@@ -120,7 +121,7 @@ function parseHaeDate(s) {
   return Number.isFinite(t) ? { t, date: m[1], hhmm: m[2] } : null;
 }
 
-export function summariseWorkout(w, now) {
+function summariseWorkout(w, now) {
   if (!w || typeof w !== "object") return null;
   const acts = Array.isArray(w.activities) ? w.activities : [];
   const tennis = /tennis/i.test(String(w.name || "")) || acts.some((a) => /tennis/i.test(String(a && a.activityType || "")));

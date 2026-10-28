@@ -16,18 +16,18 @@
 <link rel="apple-touch-icon" href="/pwa/tennis-fitness/apple-touch-icon.png">
 <link rel="icon" href="/pwa/tennis-fitness/icon.svg" type="image/svg+xml">
 <link rel="preload" href="/log/fonts/barlow-condensed-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/log/app.css?v=10">
-<script src="/log/app.js?v=10" defer></script>
+<link rel="stylesheet" href="/log/app.css?v=11">
+<script src="/log/app.js?v=11" defer></script>
 </head>
 <body>
 <header>
   <div class="wrap">
     <div class="head"><h1>Tennis Fitness Tracker</h1><span class="status" id="status" role="status">Loading…</span></div>
     <nav role="tablist">
-      <button role="tab" id="tab-log" data-tab="log" aria-selected="true">Train</button>
-      <button role="tab" id="tab-play" data-tab="play" aria-selected="false">Play</button>
-      <button role="tab" id="tab-progress" data-tab="progress" aria-selected="false">Progress</button>
-      <button role="tab" id="tab-body" data-tab="body" aria-selected="false">Body</button>
+      <button role="tab" id="tab-log" data-tab="log" aria-controls="main" aria-selected="true">Train</button>
+      <button role="tab" id="tab-play" data-tab="play" aria-controls="main" aria-selected="false">Play</button>
+      <button role="tab" id="tab-progress" data-tab="progress" aria-controls="main" aria-selected="false">Progress</button>
+      <button role="tab" id="tab-body" data-tab="body" aria-controls="main" aria-selected="false">Body</button>
     </nav>
   </div>
 </header>

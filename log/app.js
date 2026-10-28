@@ -1,4 +1,24 @@
 "use strict";
+/* ---------- helpers ---------- */
+const $ = s=>document.querySelector(s);
+// el("div",{class:"x",onclick:fn},children…): build an element; null/false attributes and children are skipped
+const el = (tag,attrs={},...kids)=>{const n=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==="class")n.className=v;else if(k.startsWith("on"))n.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined&&v!==false)n.setAttribute(k,v===true?"":v)}for(const c of kids.flat()){if(c==null||c===false)continue;n.append(c.nodeType?c:document.createTextNode(c))}return n};
+const svgEl=(t,a={})=>{const e=document.createElementNS("http://www.w3.org/2000/svg",t);for(const k in a)e.setAttribute(k,a[k]);return e};
+// dates are "YYYY-MM-DD" in local time; noon avoids daylight-saving edge cases
+const iso = d=>{const z=new Date(d);z.setMinutes(z.getMinutes()-z.getTimezoneOffset());return z.toISOString().slice(0,10)};
+const dayT=d=>Date.parse(d+"T12:00:00");
+const weekStart=d=>{const x=new Date(d+"T12:00:00");x.setDate(x.getDate()-(x.getDay()+6)%7);return iso(x)};
+const fmtDate = s=>new Date(s+"T12:00:00").toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short"});
+const fmtShort = s=>new Date(s+"T12:00:00").toLocaleDateString("en-AU",{day:"numeric",month:"short"});
+const shortDM=d=>{const x=new Date(d+"T12:00:00");return x.getDate()+"/"+(x.getMonth()+1)};
+const num = v=>{if(v===""||v==null)return null;const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:null};
+const fmtKg = n=>n==null?"–":(Math.round(n*10)/10).toString();
+const fmtInt=n=>n==null?"–":Math.round(n).toLocaleString("en-AU");
+const fmtDur=min=>{if(min==null)return "–";const h=Math.floor(min/60),m=Math.round(min%60);return h?h+"h "+String(m).padStart(2,"0")+"m":m+"m"};
+const fmtClock=hhmm=>{if(!hhmm)return "";const[h,m]=hhmm.split(":").map(Number);return (h%12||12)+":"+String(m).padStart(2,"0")+(h<12?"am":"pm")};
+const signed=(v,d=1,u="")=>(v>0?"+":v<0?"−":"±")+Math.abs(v).toFixed(d).replace(/\.0+$/,"")+u;
+const kpi=(val,lbl,sub)=>el("div",{class:"kpi"},el("b",{class:"num"},val),el("span",{},lbl),sub?el("small",{},sub):null);
+
 /* Each day is ordered into weight "stations": exercises in a station use the same
    dumbbell setup, so you only reload between stations. kg = default per-dumbbell
    weight (assuming a 2 kg handle) until you've logged the station's first exercise. */
@@ -237,8 +257,7 @@ function reachable(kit){
 const sideText=l=>{const p=[];for(let i=0;i<l.big;i++)p.push("2.5");for(let i=0;i<l.small;i++)p.push("1.25");return p.length?p.join(" + ")+" each side":"no plates"};
 
 function dumbbellSVG(l){
-  const ns="http://www.w3.org/2000/svg",W=320,H=96,cx=W/2;
-  const mk=(t,a)=>{const e=document.createElementNS(ns,t);for(const k in a)e.setAttribute(k,a[k]);return e};
+  const W=320,H=96,cx=W/2,mk=svgEl;
   const s=mk("svg",{viewBox:`0 0 ${W} ${H}`,class:"dbsvg",role:"img","aria-label":`Dumbbell loaded with ${sideText(l)}`});
   const grip=64,bigW=14,smallW=10,gap=2;
   s.append(mk("rect",{x:20,y:H/2-4,width:W-40,height:8,rx:3,class:"db-bar"}));
@@ -309,13 +328,6 @@ function stationHeader(day,stId,first){
 const ORDER = ["push","pull","upper"];
 const EX = {}; ORDER.forEach(d=>PLAN[d].ex.forEach(e=>EX[e.id]={...e,day:d}));
 
-const $ = s=>document.querySelector(s);
-const el = (tag,attrs={},...kids)=>{const n=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==="class")n.className=v;else if(k.startsWith("on"))n.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined&&v!==false)n.setAttribute(k,v===true?"":v)}for(const c of kids.flat()){if(c==null||c===false)continue;n.append(c.nodeType?c:document.createTextNode(c))}return n};
-const iso = d=>{const z=new Date(d);z.setMinutes(z.getMinutes()-z.getTimezoneOffset());return z.toISOString().slice(0,10)};
-const fmtDate = s=>new Date(s+"T12:00:00").toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short"});
-const fmtShort = s=>new Date(s+"T12:00:00").toLocaleDateString("en-AU",{day:"numeric",month:"short"});
-const num = v=>{if(v===""||v==null)return null;const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:null};
-const fmtKg = n=>n==null?"–":(Math.round(n*10)/10).toString();
 
 function defaultDay(){const dow=new Date().getDay();for(let i=0;i<7;i++){const d=(dow+i)%7;const hit=ORDER.find(k=>PLAN[k].dow===d);if(hit)return hit}return "push"}
 
@@ -349,12 +361,6 @@ function lastFor(exId,beforeDate,excludeId){
   const list=sessionsSorted().filter(s=>(s.date+"_"+s.day)!==excludeId&&s.date<=beforeDate&&doneSets(s.entries&&s.entries[exId]).length);
   return list.length?list[list.length-1]:null;
 }
-function best(exId,sess){
-  const sets=doneSets(sess.entries[exId]);if(!sets.length)return null;
-  const e=EX[exId];
-  if(e.load==="kg"){const k=Math.max(...sets.map(s=>s.kg??0));return k}
-  return Math.max(...sets.map(s=>s.reps??0));
-}
 function readyToProgress(e,sess){
   if(e.hi==null)return null;
   const sets=doneSets(sess.entries[e.id]);
@@ -379,15 +385,17 @@ function tick(){
   $("#timer").classList.toggle("over",left<=0);
   $("#timer-bar").style.width=Math.max(0,Math.min(100,(1-left/t.total)*100))+"%";
   if(left<=0&&!t.beeped){t.beeped=true;beep()}
+  if(left<-300){stopTimer();return}
   clearTimeout(t.h);t.h=setTimeout(tick,250);
 }
 $("#calc-close").onclick=()=>$("#calc").close();
 $("#calc").addEventListener("click",e=>{if(e.target===$("#calc"))$("#calc").close()});
 $("#timer-add").onclick=()=>{if(S.timer){S.timer.end+=15000;S.timer.total+=15;S.timer.beeped=false;tick()}};
-$("#timer-skip").onclick=()=>{if(S.timer)clearTimeout(S.timer.h);S.timer=null;$("#timer").hidden=true};
+function stopTimer(){if(S.timer)clearTimeout(S.timer.h);S.timer=null;$("#timer").hidden=true}
+$("#timer-skip").onclick=stopTimer;
 
 /* ---------- views ---------- */
-const tickIcon=()=>{const s=document.createElementNS("http://www.w3.org/2000/svg","svg");s.setAttribute("viewBox","0 0 24 24");s.innerHTML='<path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>';return s};
+const tickIcon=()=>{const s=svgEl("svg",{viewBox:"0 0 24 24","aria-hidden":"true"});s.append(svgEl("path",{d:"M5 12.5l4.5 4.5L19 7.5",fill:"none","stroke-width":"2.6","stroke-linecap":"round","stroke-linejoin":"round"}));return s};
 
 function renderLog(){
   const m=$("#main");m.replaceChildren();
@@ -460,7 +468,7 @@ function exCard(e,next){
       if(on){const lastSet=i===e.sets-1;startTimer(lastSet?Math.max(e.rest,90):e.rest,lastSet?(next?next.n:"session done"):e.n+" set "+(i+2))}
     }},tickIcon());
     row.append(el("span",{class:"n"},String(i+1)),
-      el("div",{class:"field"},kgIn,el("i",{},e.load==="band"?"kg?":e.load==="bw"?"+kg":"kg")),
+      el("div",{class:"field"},kgIn,el("i",{},e.load==="bw"?"+kg":"kg")),
       el("div",{class:"field"},rIn,el("i",{},"reps")),btn);
     sets.append(row);
   }
@@ -469,14 +477,12 @@ function exCard(e,next){
 }
 
 function sparkSVG(vals,w,h,pad){
-  const ns="http://www.w3.org/2000/svg";const s=document.createElementNS(ns,"svg");
-  s.setAttribute("viewBox",`0 0 ${w} ${h}`);s.setAttribute("class","spark");s.setAttribute("aria-hidden","true");
+  const s=svgEl("svg",{viewBox:`0 0 ${w} ${h}`,class:"spark","aria-hidden":"true"});
   const lo=Math.min(...vals),hi=Math.max(...vals),r=hi-lo||1;
   const pts=vals.map((v,i)=>[pad+(vals.length===1?0:i*(w-2*pad)/(vals.length-1)),h-pad-((v-lo)/r)*(h-2*pad)]);
-  const line=document.createElementNS(ns,"polyline");line.setAttribute("points",pts.map(p=>p.join(",")).join(" "));
-  line.setAttribute("fill","none");line.setAttribute("stroke","var(--accent)");line.setAttribute("stroke-width","1.8");line.setAttribute("stroke-linejoin","round");
-  const dot=document.createElementNS(ns,"circle");const L=pts[pts.length-1];dot.setAttribute("cx",L[0]);dot.setAttribute("cy",L[1]);dot.setAttribute("r","2.8");dot.setAttribute("fill","var(--accent)");
-  s.append(line,dot);return s;
+  const L=pts[pts.length-1];
+  s.append(svgEl("polyline",{points:pts.map(p=>p.join(",")).join(" "),class:"ln s1"}),svgEl("circle",{cx:L[0],cy:L[1],r:2.8,class:"dot s1"}));
+  return s;
 }
 
 /* ---------- charts ----------
@@ -487,9 +493,6 @@ function chartW(){
   const cs=getComputedStyle(m);
   return Math.round(Math.max(260,Math.min(620,m.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)-30)));
 }
-const svgEl=(t,a={})=>{const e=document.createElementNS("http://www.w3.org/2000/svg",t);for(const k in a)e.setAttribute(k,a[k]);return e};
-const dayT=d=>Date.parse(d+"T12:00:00");
-const shortDM=d=>{const x=new Date(d+"T12:00:00");return x.getDate()+"/"+(x.getMonth()+1)};
 function niceStep(raw){const p=10**Math.floor(Math.log10(raw||1));for(const m of [1,2,2.5,5,10])if(m*p>=raw)return m*p;return 10*p}
 // series: [{name, cls:"s1"|"s2"|"s3", pts:[{t:"YYYY-MM-DD", v}]}]; band: {name, lo:[pts], hi:[pts]}
 function lineChart({series,band,fmt=(v,dec)=>v.toFixed(dec),zero=false,H=190,label}){
@@ -557,7 +560,6 @@ function atPlateLimit(e,sess,day){
   const kgs=doneSets(sess.entries[e.id]).map(s=>s.kg).filter(v=>v!=null);
   return kgs.length>0&&Math.max(...kgs)>=plateMax(kit)-0.01;
 }
-const signed=(v,d=1,u="")=>(v>0?"+":v<0?"−":"±")+Math.abs(v).toFixed(d).replace(/\.0+$/,"")+u;
 
 function renderProgress(){
   const m=$("#main");m.replaceChildren();
@@ -570,7 +572,6 @@ function renderProgress(){
   const weekAgo=iso(new Date(Date.now()-6*864e5));
 
   // headline
-  const kpi=(val,lbl,sub)=>el("div",{class:"kpi"},el("b",{class:"num"},val),el("span",{},lbl),sub?el("small",{},sub):null);
   m.append(el("section",{class:"panel"},el("h2",{},"Your progress"),
     el("div",{class:"kpis"},
       kpi(wts.length>1?signed(wts[wts.length-1].v-wts[0].v,1," kg"):"–","bodyweight",wts.length>1?"since "+fmtShort(wts[0].t):"log weekly"),
@@ -617,7 +618,7 @@ function renderProgress(){
       const scores=hist.map(s=>sessionScore(e,s)).filter(v=>v!=null);
       const pct=scores.length>1?(scores[scores.length-1]/scores[0]-1)*100:null;
       const limit=atPlateLimit(e,last,d);
-      row.append(el("div",{class:"nm"},e.n,el("small",{},`${hist.length} session${hist.length>1?"s":""}`+(limit?"":"")),limit?el("span",{class:"chip warn"},"At plate limit"):null),
+      row.append(el("div",{class:"nm"},e.n,el("small",{},`${hist.length} session${hist.length>1?"s":""}`),limit?el("span",{class:"chip warn"},"At plate limit"):null),
         scores.length>=2?sparkSVG(scores,92,28,3):el("span",{}),
         el("div",{class:"v"},e.load==="kg"&&bs&&bs.kg!=null?`${fmtKg(bs.kg)} kg × ${bs.reps??"–"}`:`${bs&&bs.reps!=null?bs.reps:"–"} reps`,
           pct!=null?el("span",{class:"d "+(pct>0.5?"pos":pct<-0.5?"neg":"flat")},signed(pct,0,"%")+" since "+fmtShort(first.date)):null));
@@ -625,7 +626,7 @@ function renderProgress(){
     });
     m.append(panel);
   });
-  if(allExercises().some(e=>{const h=sessions.filter(s=>doneSets(s.entries[e.id]).length);return h.length&&atPlateLimit(e,h[h.length-1],Object.keys(PLAN).find(k=>PLAN[k].ex.includes(e)))}))
+  if(allExercises().some(e=>{const h=sessions.filter(s=>doneSets(s.entries[e.id]).length);return h.length&&atPlateLimit(e,h[h.length-1],EX[e.id].day)}))
     m.append(el("p",{class:"notice"},el("b",{},"Some lifts are at your plates' limit. "),"Keep progressing them with extra reps or a slower 3–4 second lowering, and consider more 2.5 kg plates so the weight can keep rising."));
 
   m.append(el("section",{class:"panel"},el("h2",{},"Your data"),
@@ -640,15 +641,16 @@ function renderProgress(){
 /* ---------- this session: live progress and summary ---------- */
 function sessionStats(){
   const p=PLAN[S.day],entries=(S.draft&&S.draft.entries)||{};
-  let total=0,done=0,exDone=0,vol=0;
-  p.ex.forEach(e=>{
-    const d=doneSets(entries[e.id]).length;total+=e.sets;done+=Math.min(d,e.sets);if(d>=e.sets)exDone++;
-    doneSets(entries[e.id]).forEach(s=>{if(e.load==="kg"&&s.kg!=null&&s.reps)vol+=s.kg*s.reps*(e.unit==="per hand"?2:1)});
-  });
-  return {total,done,exDone,exTotal:p.ex.length,vol};
+  let total=0,done=0,exDone=0;
+  p.ex.forEach(e=>{const d=doneSets(entries[e.id]).length;total+=e.sets;done+=Math.min(d,e.sets);if(d>=e.sets)exDone++});
+  return {total,done,exDone,exTotal:p.ex.length,vol:sessionVolume({entries},S.day)};
 }
+// kg × reps over completed sets; "per hand" exercises count both dumbbells
 function sessionVolume(sess,day,only){
-  let v=0;PLAN[day].ex.filter(e=>!only||only.has(e.id)).forEach(e=>doneSets(sess.entries&&sess.entries[e.id]).forEach(s=>{if(e.load==="kg"&&s.kg!=null&&s.reps)v+=s.kg*s.reps*(e.unit==="per hand"?2:1)}));return v;
+  let v=0;
+  PLAN[day].ex.filter(e=>e.load==="kg"&&(!only||only.has(e.id))).forEach(e=>
+    doneSets(sess.entries&&sess.entries[e.id]).forEach(s=>{if(s.kg!=null&&s.reps)v+=s.kg*s.reps*(e.unit==="per hand"?2:1)}));
+  return v;
 }
 function updateSession(){
   const bar=$("#sessbar"),sum=$("#sess-sum");if(!bar||!sum)return;
@@ -686,13 +688,13 @@ function renderBody(){
   const m=$("#main");m.replaceChildren();
   const today=iso(new Date());const cur=S.body[today]||{};
   const f=(id,label,unit,val)=>el("label",{for:id},label,el("div",{class:"field"},el("input",{type:"number",inputmode:"decimal",step:"0.1",min:"0",id,value:val??""}),el("i",{},unit)));
-  const form=el("form",{class:"form",onsubmit:async ev=>{
+  const form=el("form",{class:"form",onsubmit:ev=>{
     ev.preventDefault();
     const d=$("#b-date").value||today;
     const rec={date:d,weight:num($("#b-weight").value),arm:num($("#b-arm").value),chest:num($("#b-chest").value),waist:num($("#b-waist").value),photo:$("#b-photo").checked,updatedAt:new Date().toISOString()};
     if([rec.weight,rec.arm,rec.chest,rec.waist].every(v=>v==null)&&!rec.photo){$("#b-msg").textContent="Enter at least one measurement.";return}
     $("#b-msg").textContent="Saving…";
-    try{await S.db.collection("body").doc(d).set(rec);$("#b-msg").textContent="Saved for "+fmtDate(d)+(Sync.state==="offline"?". It will sync when you're back online.":".");renderBodyLists()}
+    try{S.db.collection("body").doc(d).set(rec);$("#b-msg").textContent="Saved for "+fmtDate(d)+(Sync.state==="offline"?". It will sync when you're back online.":".");renderBodyLists()}
     catch(e){$("#b-msg").textContent="Couldn't save. Try again in a moment."}
   }},
     el("label",{for:"b-date",class:"full"},"Date",el("div",{class:"field"},el("input",{type:"date",id:"b-date",value:today,max:today,onchange:e=>{const r=S.body[e.target.value]||{};$("#b-weight").value=r.weight??"";$("#b-arm").value=r.arm??"";$("#b-chest").value=r.chest??"";$("#b-waist").value=r.waist??"";$("#b-photo").checked=!!r.photo}}))),
@@ -727,16 +729,11 @@ const ZONES=[{n:"Z1",lo:0,hi:.6,label:"Easy"},{n:"Z2",lo:.6,hi:.7,label:"Steady"
 // It falls by about 1 bpm a year: review it every year or two.
 const MAX_HR=196;
 function playSorted(){return Object.values(S.play||{}).filter(p=>p&&p.date).sort((a,b)=>(a.start||a.date)<(b.start||b.date)?1:-1)}
-function hrMax(){return MAX_HR}
 function zoneMinutes(p,max){
   const z=[0,0,0,0,0];if(!Array.isArray(p.hr))return null;
   for(const v of p.hr){if(v==null)continue;const r=v/max;const i=ZONES.findIndex(Z=>r>=Z.lo&&r<Z.hi);z[i<0?4:i]++}
   return z.some(Boolean)?z:null;
 }
-const fmtDur=min=>{if(min==null)return "–";const h=Math.floor(min/60),m=Math.round(min%60);return h?h+"h "+String(m).padStart(2,"0")+"m":m+"m"};
-const fmtInt=n=>n==null?"–":Math.round(n).toLocaleString("en-AU");
-const fmtClock=hhmm=>{if(!hhmm)return "";const[h,m]=hhmm.split(":").map(Number);return (h%12||12)+":"+String(m).padStart(2,"0")+(h<12?"am":"pm")};
-function weekStart(dateStr){const d=new Date(dateStr+"T12:00:00");const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow);return iso(d)}
 
 function recentTennis(){
   // a session that finished within the last 20 hours
@@ -753,19 +750,17 @@ function zoneBar(z){
 }
 
 function hrTrace(p,max){
-  const ns="http://www.w3.org/2000/svg",W=chartW(),H=150,P={l:34,r:10,t:8,b:22};
+  const W=chartW(),H=150,P={l:34,r:10,t:8,b:22},mk=svgEl;
   const pts=p.hr.map((v,i)=>v==null?null:[i,v]).filter(Boolean);if(pts.length<2)return null;
   const lo=Math.max(40,Math.floor(Math.min(...pts.map(q=>q[1]))/20)*20),hi=Math.ceil(Math.max(...pts.map(q=>q[1]),max*.9)/20)*20;
   const n=p.hr.length-1||1;const X=i=>P.l+i/n*(W-P.l-P.r),Y=v=>P.t+(hi-v)/(hi-lo)*(H-P.t-P.b);
-  const s=document.createElementNS(ns,"svg");s.setAttribute("viewBox",`0 0 ${W} ${H}`);s.setAttribute("width",W);s.setAttribute("height",H);s.setAttribute("class","chart");s.setAttribute("role","img");
-  s.setAttribute("aria-label",`Heart rate during the session, average ${p.avgHr}, max ${p.maxHr} bpm`);
-  const mk=(tag,a)=>{const e=document.createElementNS(ns,tag);for(const k in a)e.setAttribute(k,a[k]);return e};
+  const s=mk("svg",{viewBox:`0 0 ${W} ${H}`,width:W,height:H,class:"chart",role:"img","aria-label":`Heart rate during the session, average ${p.avgHr}, max ${p.maxHr} bpm`});
   // zone bands
   ZONES.forEach((Z,i)=>{const top=Math.min(hi,Z.hi*max),bot=Math.max(lo,Z.lo*max);if(top<=bot)return;
     s.append(mk("rect",{x:P.l,y:Y(top),width:W-P.l-P.r,height:Y(bot)-Y(top),class:"band z"+(i+1)}))});
-  for(let v=lo;v<=hi;v+=20){s.append(mk("line",{x1:P.l,x2:W-P.r,y1:Y(v),y2:Y(v),stroke:"var(--line)"}));const t=mk("text",{x:P.l-6,y:Y(v)+4,"text-anchor":"end"});t.textContent=v;s.append(t)}
+  for(let v=lo;v<=hi;v+=20){s.append(mk("line",{x1:P.l,x2:W-P.r,y1:Y(v),y2:Y(v),class:"grid"}));const t=mk("text",{x:P.l-6,y:Y(v)+4,"text-anchor":"end"});t.textContent=v;s.append(t)}
   let d="";let pen=false;p.hr.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?"L":"M")+X(i).toFixed(1)+","+Y(v).toFixed(1);pen=true});
-  s.append(mk("path",{d,fill:"none",stroke:"var(--ink)","stroke-width":"1.6","stroke-linejoin":"round"}));
+  s.append(mk("path",{d,class:"ln hr"}));
   const last=p.hr.length-1;[[0,"0"],[last,fmtDur(last)]].forEach(([i,l],k)=>{const t=mk("text",{x:X(i),y:H-4,"text-anchor":k?"end":"start"});t.textContent=l;s.append(t)});
   return s;
 }
@@ -790,15 +785,14 @@ function playCard(p,max){
 }
 
 function weeklyChart(weeks){
-  const ns="http://www.w3.org/2000/svg",W=chartW(),H=170,P={l:30,r:8,t:14,b:24};
-  const mk=(tag,a)=>{const e=document.createElementNS(ns,tag);for(const k in a)e.setAttribute(k,a[k]);return e};
+  const W=chartW(),H=170,P={l:30,r:8,t:14,b:24},mk=svgEl;
   const maxH=Math.max(4,Math.ceil(Math.max(...weeks.map(w=>w.min/60))));
   const s=mk("svg",{viewBox:`0 0 ${W} ${H}`,width:W,height:H,class:"chart",role:"img","aria-label":"Hours of tennis per week, last 8 weeks"});
   const bw=(W-P.l-P.r)/weeks.length,Y=v=>P.t+(maxH-v)/maxH*(H-P.t-P.b);
   const step=maxH>8?2:1;
-  for(let v=0;v<=maxH;v+=step){s.append(mk("line",{x1:P.l,x2:W-P.r,y1:Y(v),y2:Y(v),stroke:"var(--line)"}));const t=mk("text",{x:P.l-6,y:Y(v)+4,"text-anchor":"end"});t.textContent=v+"h";s.append(t)}
+  for(let v=0;v<=maxH;v+=step){s.append(mk("line",{x1:P.l,x2:W-P.r,y1:Y(v),y2:Y(v),class:"grid"}));const t=mk("text",{x:P.l-6,y:Y(v)+4,"text-anchor":"end"});t.textContent=v+"h";s.append(t)}
   weeks.forEach((w,i)=>{const h=w.min/60,x=P.l+i*bw+bw*.18,wd=bw*.64;
-    if(h>0)s.append(mk("rect",{x,y:Y(h),width:wd,height:Y(0)-Y(h),rx:3,fill:i===weeks.length-1?"var(--accent)":"var(--accent-soft)",stroke:"var(--accent)","stroke-width":i===weeks.length-1?0:1}));
+    if(h>0)s.append(mk("rect",{x,y:Y(h),width:wd,height:Y(0)-Y(h),rx:3,class:i===weeks.length-1?"wbar now":"wbar"}));
     if(w.n){const t=mk("text",{x:x+wd/2,y:Y(h)-5,"text-anchor":"middle"});t.textContent=w.n+"×";s.append(t)}
     const t=mk("text",{x:x+wd/2,y:H-6,"text-anchor":"middle"});t.textContent=i===weeks.length-1?"Now":shortDM(w.start);s.append(t)});
   return s;
@@ -807,7 +801,7 @@ function weeklyChart(weeks){
 let playShown=8;
 function renderPlay(){
   const m=$("#main");m.replaceChildren();
-  const list=playSorted(),max=hrMax();
+  const list=playSorted(),max=MAX_HR;
   const thisWk=weekStart(iso(new Date()));
   const weeks=[];for(let i=7;i>=0;i--){const d=new Date(thisWk+"T12:00:00");d.setDate(d.getDate()-7*i);weeks.push({start:iso(d),min:0,n:0,kcal:0})}
   list.forEach(p=>{const w=weeks.find(w=>w.start===weekStart(p.date));if(w){w.min+=p.durationMin||0;w.n++;w.kcal+=p.activeKcal||0}});
@@ -819,9 +813,7 @@ function renderPlay(){
   }else{
     m.append(el("section",{class:"panel"},el("h2",{},"This week"),
       el("div",{class:"kpis"},
-        el("div",{class:"kpi"},el("b",{class:"num"},String(cur.n)),el("span",{},cur.n===1?"session":"sessions")),
-        el("div",{class:"kpi"},el("b",{class:"num"},fmtDur(cur.min)),el("span",{},"court time")),
-        el("div",{class:"kpi"},el("b",{class:"num"},fmtInt(cur.kcal)),el("span",{},"kcal burned"))),
+        kpi(String(cur.n),cur.n===1?"session":"sessions"),kpi(fmtDur(cur.min),"court time"),kpi(fmtInt(cur.kcal),"kcal burned")),
       el("p",{class:"hint"},avgMin?`Your 4-week average is ${fmtDur(avgMin)} a week.`:"Averages appear once you have a few weeks of sessions."),
       weeklyChart(weeks)));
     const sec=el("div",{class:"plist"});
@@ -838,33 +830,34 @@ function renderPlay(){
     el("div",{class:"row"},el("button",{type:"button",class:"btn",onclick:()=>inp.click()},"Import export file"),inp,el("span",{class:"hint",id:"play-msg","aria-live":"polite"},playMsgText))));
 }
 
+// the import message survives the Play tab re-rendering when new data arrives
 let playMsgText="";
-const msg={set textContent(t){playMsgText=t;const e=$("#play-msg");if(e)e.textContent=t}};
+const setPlayMsg=t=>{playMsgText=t;const e=$("#play-msg");if(e)e.textContent=t};
 async function importHealthFile(file){
   if(!file)return;
-  msg.textContent="Reading…";
-  let data;try{data=JSON.parse(await file.text())}catch(e){msg.textContent="That file isn't a Health Auto Export JSON file.";return}
+  setPlayMsg("Reading…");
+  let data;try{data=JSON.parse(await file.text())}catch(e){setPlayMsg("That file isn't a Health Auto Export JSON file.");return}
   const all=(data&&data.data&&data.data.workouts)||(data&&data.workouts)||[];
   const keep=["id","name","start","end","duration","activeEnergyBurned","totalEnergy","avgHeartRate","maxHeartRate","heartRate","heartRateData","distance","stepCount","temperature","humidity","activities"];
   const tennis=all.filter(w=>w&&(/tennis/i.test(w.name||"")||(w.activities||[]).some(a=>/tennis/i.test((a&&a.activityType)||""))))
     .map(w=>{const o={};keep.forEach(k=>{if(w[k]!==undefined)o[k]=w[k]});if(Array.isArray(o.activities))o.activities=o.activities.map(a=>({activityType:a.activityType}));return o});
   const span=list=>{const d=list.map(w=>String(w.start||"").slice(0,10)).filter(Boolean).sort();return d.length?`${fmtShort(d[0])} – ${fmtShort(d[d.length-1])}`:""};
   const found=`Found ${all.length} workout${all.length===1?"":"s"}${all.length?" ("+span(all)+")":""}`;
-  if(!tennis.length){msg.textContent=all.length?`${found}, but none were tennis.`:"No workouts in that file. Include Workouts when exporting.";return}
+  if(!tennis.length){setPlayMsg(all.length?`${found}, but none were tennis.`:"No workouts in that file. Include Workouts when exporting.");return}
   let saved=0,created=0;
   try{
     for(let i=0;i<tennis.length;i+=10){
-      msg.textContent=`Importing ${Math.min(i+10,tennis.length)} of ${tennis.length}…`;
+      setPlayMsg(`Importing ${Math.min(i+10,tennis.length)} of ${tennis.length}…`);
       const r=await api("POST","/ingest",{data:{workouts:tennis.slice(i,i+10)}});saved+=r.tennis||0;created+=r.created||0;
     }
     const n=tennis.length,skipped=n-saved;
-    msg.textContent=`${found}. ${n} tennis: ${created} new, ${saved-created} already here`+(skipped?`, ${skipped} unreadable`:"")+".";
+    setPlayMsg(`${found}. ${n} tennis: ${created} new, ${saved-created} already here`+(skipped?`, ${skipped} unreadable`:"")+".");
     await refresh();
   }catch(e){
-    msg.textContent=e.kind==="signin"?"Sign in again, then retry the import.":e.kind==="offline"?"You're offline. Try again with a connection.":"Import failed. Try a smaller date range.";
+    setPlayMsg(e.kind==="signin"?"Sign in again, then retry the import.":e.kind==="offline"?"You're offline. Try again with a connection.":"Import failed. Try a smaller date range.");
     if(e.kind==="signin")setState("signin");
   }
-  $("#play-file")&&($("#play-file").value="");
+  const f=$("#play-file");if(f)f.value="";
 }
 
 /* ---------- tabs (also reachable as /log/#train, #play, #progress, #body) ---------- */
@@ -915,7 +908,8 @@ function exportFile(kind){
     name=`tennis-fitness-body-${today}.csv`;text=csv(rows);type="text/csv";
   }else{
     name=`tennis-fitness-backup-${today}.json`;type="application/json";
-    text=JSON.stringify({app:"Tennis Fitness Tracker",exportedAt:new Date().toISOString(),sessions:S.sessions,body:S.body,play:S.play},null,2);
+    const rejected=lsGet(LS_REJECTED,[]);
+    text=JSON.stringify({app:"Tennis Fitness Tracker",exportedAt:new Date().toISOString(),sessions:S.sessions,body:S.body,play:S.play,...(rejected.length?{unsyncedRejected:rejected}:{})},null,2);
   }
   const blob=new Blob([text],{type});
   try{
@@ -933,9 +927,9 @@ function exportFile(kind){
 const LS_DATA="tft:data",LS_QUEUE="tft:queue",LS_REJECTED="tft:rejected";
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-const Sync={server:lsGet(LS_DATA,{sessions:{},body:{}}),queue:lsGet(LS_QUEUE,[]),inflight:new Set(),
+const asData=d=>({sessions:(d&&d.sessions)||{},body:(d&&d.body)||{},play:(d&&d.play)||{}});
+const Sync={server:asData(lsGet(LS_DATA,null)),queue:lsGet(LS_QUEUE,[]),inflight:new Set(),
   state:"loading",loaded:false,chain:Promise.resolve(),flushQueued:false,flushT:null,retryT:null,retryMs:5000,subs:[]};
-Sync.server.sessions=Sync.server.sessions||{};Sync.server.body=Sync.server.body||{};Sync.server.play=Sync.server.play||{};
 
 function viewData(){
   const v={sessions:{...Sync.server.sessions},body:{...Sync.server.body},play:{...Sync.server.play}};
@@ -956,10 +950,11 @@ function setState(st){Sync.state=st;showSync()}
 function serial(fn){Sync.chain=Sync.chain.then(fn,fn);return Sync.chain}
 
 async function api(method,path,body){
+  const json=body?JSON.stringify(body):undefined;
   let r;
   try{r=await fetch("/api/log"+path,{method,credentials:"same-origin",redirect:"manual",cache:"no-store",
-    keepalive:!!body&&JSON.stringify(body).length<60000,
-    headers:body?{"content-type":"application/json"}:{},body:body?JSON.stringify(body):undefined})}
+    keepalive:!!json&&json.length<60000, // lets a save finish if the app is closed mid-request
+    headers:json?{"content-type":"application/json"}:{},body:json})}
   catch(e){throw {kind:"offline"}}
   if(r.type==="opaqueredirect"||r.status===401||r.status===403)throw {kind:"signin"};
   if(!r.ok)throw {kind:r.status>=500||r.status===429?"offline":"bad",status:r.status};
@@ -1011,7 +1006,7 @@ function refresh(){
   return serial(async()=>{
     try{
       const d=await api("GET","");
-      Sync.server={sessions:d.sessions||{},body:d.body||{},play:d.play||{}};lsSet(LS_DATA,Sync.server);
+      Sync.server=asData(d);lsSet(LS_DATA,Sync.server);
       Sync.loaded=true;Sync.retryMs=5000;clearTimeout(Sync.retryT);
       setState("synced");publish();
       if(Sync.queue.length)flushSoon(0);
