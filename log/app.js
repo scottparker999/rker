@@ -401,7 +401,9 @@ function renderLog(){
     el("span",{},S.sessions[sid()]?"Logged · edits save automatically":"Ticks save automatically"),
     el("button",{type:"button",class:"btn quiet",onclick:()=>openCalc(null,"pair")},"Plate calculator")
   ));
+  m.append(el("div",{class:"sessbar",id:"sessbar","aria-live":"polite"}));
   p.ex.forEach((e,idx)=>{if(!idx||p.ex[idx-1].st!==e.st)m.append(stationHeader(S.day,e.st,!idx));m.append(exCard(e,p.ex[idx+1]))});
+  m.append(el("section",{class:"panel sess-sum",id:"sess-sum",hidden:true}));
   // footer actions
   const exists=!!S.sessions[sid()];
   if(exists){
@@ -411,6 +413,7 @@ function renderLog(){
         : el("button",{type:"button",class:"btn quiet",onclick:()=>{S.confirmClear=true;renderLog()}},"Delete this session")
     ));
   }
+  updateSession();
   m.append(el("p",{class:"hint"},"Warm up 5–10 minutes first. Finish each set with 1–2 reps in the tank. Grey numbers are last session's; tick a set to accept them."+("wakeLock" in navigator?" The screen stays on while this tab is open.":"")));
 }
 function clearSession(){
@@ -430,7 +433,7 @@ function exCard(e,next){
     el("div",{class:"ex-top"},el("h2",{},e.n),el("span",{class:"target"},target)),
     el("div",{class:"specs"},el("span",{},"Start ",el("b",{},e.start)," ",e.unit),el("span",{},"Rest ",el("b",{},e.rest>=120?Math.floor(e.rest/60)+(e.rest%60?":"+String(e.rest%60).padStart(2,"0"):"")+" min":e.rest+" s"))),
     last?el("div",{class:"last"},el("span",{class:"num"},fmtShort(last.date)+": "+lastTxt),
-      ready===true?el("span",{class:"chip up"},e.load==="kg"?"Add 2.5 kg":"Make it harder"):ready===false?el("span",{class:"chip hold"},"Same again"):null)
+      ready===true?(atPlateLimit(e,last,S.day)?el("span",{class:"chip warn",title:"No heavier loading possible with your plates"},"At plate limit: add reps"):el("span",{class:"chip up"},e.load==="kg"?"Add 2.5 kg":"Make it harder")):ready===false?el("span",{class:"chip hold"},"Same again"):null)
       :el("div",{class:"last"},"First time. Start at the low end and find your weight."),
   );
   if(e.pair&&EX[e.pair]){
@@ -448,7 +451,7 @@ function exCard(e,next){
     const row=el("div",{class:"set"+(cur.done?" done":"")});
     const kgIn=el("input",{type:"number",inputmode:"decimal",step:"0.5",min:"0",id:`kg-${e.id}-${i}`,"aria-label":`${e.n} set ${i+1} kilograms`,placeholder:kgPh,value:cur.kg??""});
     const rIn=el("input",{type:"number",inputmode:"numeric",step:"1",min:"0",id:`reps-${e.id}-${i}`,"aria-label":`${e.n} set ${i+1} reps`,placeholder:repPh,value:cur.reps??""});
-    const write=()=>{entries[i]={kg:num(kgIn.value),reps:num(rIn.value),done:row.classList.contains("done")};scheduleSave()};
+    const write=()=>{entries[i]={kg:num(kgIn.value),reps:num(rIn.value),done:row.classList.contains("done")};scheduleSave();updateSession()};
     kgIn.addEventListener("input",write);rIn.addEventListener("input",write);
     const btn=el("button",{type:"button",class:"tick","aria-label":`Mark set ${i+1} done`,"aria-pressed":String(!!cur.done),onclick:()=>{
       const on=!row.classList.contains("done");
@@ -476,35 +479,155 @@ function sparkSVG(vals,w,h,pad){
   s.append(line,dot);return s;
 }
 
+/* ---------- charts ----------
+   Charts are drawn at the real width of the screen (1 SVG unit = 1 CSS pixel), so
+   their labels stay at a readable size on a phone and don't balloon on a desktop. */
+function chartW(){
+  const m=$("#main");if(!m)return 340;
+  const cs=getComputedStyle(m);
+  return Math.round(Math.max(260,Math.min(620,m.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)-30)));
+}
+const svgEl=(t,a={})=>{const e=document.createElementNS("http://www.w3.org/2000/svg",t);for(const k in a)e.setAttribute(k,a[k]);return e};
+const dayT=d=>Date.parse(d+"T12:00:00");
+const shortDM=d=>{const x=new Date(d+"T12:00:00");return x.getDate()+"/"+(x.getMonth()+1)};
+function niceStep(raw){const p=10**Math.floor(Math.log10(raw||1));for(const m of [1,2,2.5,5,10])if(m*p>=raw)return m*p;return 10*p}
+// series: [{name, cls:"s1"|"s2"|"s3", pts:[{t:"YYYY-MM-DD", v}]}]; band: {name, lo:[pts], hi:[pts]}
+function lineChart({series,band,fmt=(v,dec)=>v.toFixed(dec),zero=false,H=190,label}){
+  const W=chartW(),P={l:42,r:12,t:12,b:24};
+  const pts=[...series.flatMap(s=>s.pts),...(band?[...band.lo,...band.hi]:[])];
+  const ts=pts.map(p=>dayT(p.t)),t0=Math.min(...ts),t1=Math.max(...ts),tr=t1-t0||864e5;
+  let lo=Math.min(...pts.map(p=>p.v),...(zero?[0]:[])),hi=Math.max(...pts.map(p=>p.v),...(zero?[0]:[]));
+  if(hi-lo<1e-9){hi+=1;lo-=1}
+  const step=niceStep((hi-lo)/4);lo=Math.floor(lo/step)*step;hi=Math.ceil(hi/step)*step;
+  const X=t=>P.l+(dayT(t)-t0)/tr*(W-P.l-P.r),Y=v=>P.t+(hi-v)/(hi-lo)*(H-P.t-P.b);
+  const s=svgEl("svg",{viewBox:`0 0 ${W} ${H}`,width:W,height:H,class:"chart",role:"img","aria-label":label||""});
+  for(let v=lo;v<=hi+step/2;v+=step){
+    s.append(svgEl("line",{x1:P.l,x2:W-P.r,y1:Y(v),y2:Y(v),class:Math.abs(v)<1e-9&&zero?"grid zero":"grid"}));
+    const dec=step>=1?0:Math.abs(step*10-Math.round(step*10))<1e-9?1:2;
+    const t=svgEl("text",{x:P.l-6,y:Y(v)+4,"text-anchor":"end"});t.textContent=fmt(Math.round(v*100)/100,dec);s.append(t);
+  }
+  const firstT=pts.reduce((a,p)=>dayT(p.t)<dayT(a)?p.t:a,pts[0].t),lastT=pts.reduce((a,p)=>dayT(p.t)>dayT(a)?p.t:a,pts[0].t);
+  [[firstT,"start"],[lastT,"end"]].forEach(([t,anchor])=>{const x=svgEl("text",{x:anchor==="start"?P.l:W-P.r,y:H-6,"text-anchor":anchor});x.textContent=fmtShort(t);s.append(x)});
+  if(band){
+    const d="M"+band.lo.map(p=>X(p.t)+","+Y(p.v)).join("L")+"L"+band.hi.slice().reverse().map(p=>X(p.t)+","+Y(p.v)).join("L")+"Z";
+    s.append(svgEl("path",{d,class:"goalband"}));
+  }
+  series.forEach(se=>{
+    if(!se.pts.length)return;
+    const sorted=se.pts.slice().sort((a,b)=>dayT(a.t)-dayT(b.t));
+    if(sorted.length>1)s.append(svgEl("polyline",{points:sorted.map(p=>X(p.t)+","+Y(p.v)).join(" "),class:"ln "+se.cls}));
+    sorted.forEach((p,i)=>s.append(svgEl("circle",{cx:X(p.t),cy:Y(p.v),r:i===sorted.length-1?4.5:2.5,class:"dot "+se.cls})));
+  });
+  const wrap=el("div",{class:"chartwrap"},s);
+  const legend=[...series.map(se=>[se.cls,se.name]),...(band?[["band",band.name]]:[])].filter(x=>x[1]);
+  if(legend.length>1||band)wrap.append(el("div",{class:"legend"},legend.map(([c,n])=>el("span",{},el("i",{class:"key "+c}),n))));
+  return wrap;
+}
+
+/* ---------- strength maths ----------
+   Estimated one-rep max (Epley): weight × (1 + reps ÷ 30). It rises when you add
+   weight OR reps, which matters here because shared-weight stations progress by reps. */
+const e1rm=s=>s&&s.kg!=null&&s.reps?s.kg*(1+s.reps/30):null;
+function sessionScore(e,sess){
+  const sets=doneSets(sess.entries&&sess.entries[e.id]);if(!sets.length)return null;
+  if(e.load==="kg"){const v=sets.map(e1rm).filter(v=>v!=null);return v.length?Math.max(...v):null}
+  const r=sets.map(s=>s.reps).filter(v=>v!=null);return r.length?Math.max(...r):null;
+}
+function bestSet(e,sess){
+  const sets=doneSets(sess.entries&&sess.entries[e.id]);if(!sets.length)return null;
+  return sets.reduce((a,s)=>(e.load==="kg"?(e1rm(s)||0)>(e1rm(a)||0):(s.reps||0)>(a.reps||0))?s:a,sets[0]);
+}
+function allExercises(){return ORDER.flatMap(d=>PLAN[d].ex)}
+function strengthSeries(){
+  // average % change of every lift against its own first session, after each training day
+  const base={},latest={},out=[];
+  sessionsSorted().forEach(sess=>{
+    let touched=false;
+    allExercises().forEach(e=>{const v=sessionScore(e,sess);if(v==null)return;if(base[e.id]==null)base[e.id]=v;latest[e.id]=v;touched=true});
+    if(!touched)return;
+    const ids=Object.keys(base);const pct=ids.reduce((a,id)=>a+(latest[id]/base[id]-1),0)/ids.length*100;
+    const prev=out[out.length-1];if(prev&&prev.t===sess.date)prev.v=pct;else out.push({t:sess.date,v:pct});
+  });
+  return out;
+}
+const plateMax=kit=>loadKg({big:perSideMax(kit),small:perSideMax(kit)});
+function atPlateLimit(e,sess,day){
+  if(e.load!=="kg"||!sess)return false;
+  const st=PLAN[day]&&PLAN[day].stations[e.st];const kit=st&&st.kit==="one"?"one":"pair";
+  const kgs=doneSets(sess.entries[e.id]).map(s=>s.kg).filter(v=>v!=null);
+  return kgs.length>0&&Math.max(...kgs)>=plateMax(kit)-0.01;
+}
+const signed=(v,d=1,u="")=>(v>0?"+":v<0?"−":"±")+Math.abs(v).toFixed(d).replace(/\.0+$/,"")+u;
+
 function renderProgress(){
   const m=$("#main");m.replaceChildren();
-  const all=sessionsSorted().filter(s=>Object.values(s.entries||{}).some(x=>doneSets(x).length));
-  const now=new Date();const weekAgo=iso(new Date(now-6*864e5));
-  const thisWeek=all.filter(s=>s.date>=weekAgo).length;
-  const bodies=Object.values(S.body).filter(b=>b.weight!=null).sort((a,b)=>a.date<b.date?-1:1);
-  const bwChange=bodies.length>1?bodies[bodies.length-1].weight-bodies[0].weight:null;
-  m.append(el("section",{class:"panel"},el("h2",{},"Overview"),
+  const sessions=sessionsSorted().filter(s=>Object.values(s.entries||{}).some(x=>doneSets(x).length));
+  const bodies=Object.values(S.body).sort((a,b)=>a.date<b.date?-1:1);
+  const wts=bodies.filter(b=>b.weight!=null).map(b=>({t:b.date,v:b.weight}));
+  const meas=k=>{const r=bodies.filter(b=>b[k]!=null);return r.length?r.map(b=>({t:b.date,v:b[k]-r[0][k]})):[]};
+  const arm=meas("arm"),chest=meas("chest"),waist=meas("waist");
+  const str=strengthSeries();
+  const weekAgo=iso(new Date(Date.now()-6*864e5));
+
+  // headline
+  const kpi=(val,lbl,sub)=>el("div",{class:"kpi"},el("b",{class:"num"},val),el("span",{},lbl),sub?el("small",{},sub):null);
+  m.append(el("section",{class:"panel"},el("h2",{},"Your progress"),
     el("div",{class:"kpis"},
-      el("div",{class:"kpi"},el("b",{class:"num"},String(all.length)),el("span",{},"sessions logged")),
-      el("div",{class:"kpi"},el("b",{class:"num"},thisWeek+"/3"),el("span",{},"last 7 days")),
-      el("div",{class:"kpi"},el("b",{class:"num"},bwChange==null?"–":(bwChange>=0?"+":"")+fmtKg(bwChange)),el("span",{},"kg bodyweight"))
-    ),
-    all.length?null:el("p",{class:"empty"},"Your trends appear here after you log sessions on the Train tab. Each lift needs two sessions to show a line.")
-  ));
+      kpi(wts.length>1?signed(wts[wts.length-1].v-wts[0].v,1," kg"):"–","bodyweight",wts.length>1?"since "+fmtShort(wts[0].t):"log weekly"),
+      kpi(arm.length>1?signed(arm[arm.length-1].v,1," cm"):"–","arm",arm.length>1?"since "+fmtShort(arm[0].t):"measure monthly"),
+      kpi(str.length>1?signed(str[str.length-1].v,0,"%"):"–","strength",str.length>1?"since "+fmtShort(str[0].t):"after 2 sessions")),
+    el("p",{class:"hint"},`${sessions.length} session${sessions.length===1?"":"s"} logged · ${sessions.filter(s=>s.date>=weekAgo).length} of 3 in the last 7 days.`)));
+
+  // weight gain
+  const bw=el("section",{class:"panel"},el("h2",{},"Bodyweight"));
+  if(wts.length>=2){
+    const w0=wts[0],wl=wts[wts.length-1],days=(dayT(wl.t)-dayT(w0.t))/864e5,perMonth=days>0?(wl.v-w0.v)/days*30.4:0;
+    const verdict=days<21?"Keep logging: the trend needs about three weeks.":perMonth<0.25?"Below target. Eat a little more.":perMonth>0.75?"Faster than needed, so some of it may be fat.":"On target for lean gain.";
+    const mon=d=>(dayT(d)-dayT(w0.t))/864e5/30.4;
+    bw.append(el("p",{class:"hint"},el("b",{class:"num"},signed(perMonth,2," kg")+" a month")," · target +0.25 to +0.5. ",verdict),
+      lineChart({series:[{name:"Your weight",cls:"s1",pts:wts}],band:{name:"Target pace",lo:[{t:w0.t,v:w0.v},{t:wl.t,v:w0.v+0.25*mon(wl.t)}],hi:[{t:w0.t,v:w0.v},{t:wl.t,v:w0.v+0.5*mon(wl.t)}]},fmt:(v,dec)=>v.toFixed(dec),label:`Bodyweight from ${w0.v} to ${wl.v} kg`}));
+  }else bw.append(el("p",{class:"empty"},wts.length?"One weigh-in so far. The chart starts with your second.":"No weigh-ins yet. Log one on the Body tab, weekly at the same time of day."));
+  m.append(bw);
+
+  // muscle growth
+  const mu=el("section",{class:"panel"},el("h2",{},"Muscle"));
+  const muSeries=[{name:"Arm",cls:"s1",pts:arm},{name:"Chest",cls:"s2",pts:chest},{name:"Waist",cls:"s3",pts:waist}].filter(s=>s.pts.length>1);
+  if(muSeries.length){
+    mu.append(el("p",{class:"hint"},"Change in centimetres since your first measurement. Arm and chest should climb. If your waist grows faster than your arm, ease off the extra food a little."),
+      lineChart({series:muSeries,zero:true,fmt:(v,dec)=>(v>0?"+":"")+v.toFixed(dec),label:"Change in arm, chest and waist measurements"}));
+  }else mu.append(el("p",{class:"empty"},"Measure your flexed arm, chest and waist once a month on the Body tab. The chart starts with your second set of measurements."));
+  m.append(mu);
+
+  // strength
+  const sp=el("section",{class:"panel"},el("h2",{},"Strength"));
+  if(str.length>=2){
+    sp.append(el("p",{class:"hint"},"Average change across all your lifts, estimated from weight and reps, so more reps at the same weight counts as progress."),
+      lineChart({series:[{name:"Strength",cls:"s1",pts:str}],zero:true,fmt:(v,dec)=>(v>0?"+":"")+v.toFixed(dec)+"%",label:"Average strength change across all lifts"}));
+  }else sp.append(el("p",{class:"empty"},"Your strength trend appears after two training sessions."));
+  m.append(sp);
+
+  // each lift
   ORDER.forEach(d=>{
     const p=PLAN[d];const panel=el("section",{class:"panel"},el("h2",{},p.name));
     p.ex.forEach(e=>{
-      const pts=all.filter(s=>doneSets(s.entries[e.id]).length).map(s=>({date:s.date,v:best(e.id,s)}));
-      const unit=e.load==="kg"?"kg":"reps";
-      const row=el("div",{class:"trend"},el("div",{class:"nm"},e.n,el("small",{},pts.length?pts.length+" session"+(pts.length>1?"s":"")+" · best "+(e.load==="kg"?"weight":"reps"):"Not logged yet")));
-      if(pts.length>=2)row.append(sparkSVG(pts.map(p=>p.v),92,28,3));else row.append(el("span",{}));
-      if(pts.length){const f=pts[0].v,l=pts[pts.length-1].v,dl=l-f;
-        row.append(el("div",{class:"v"},fmtKg(l)+" "+unit,pts.length>1?el("span",{class:"d "+(dl>0?"pos":dl<0?"neg":"flat")},(dl>0?"+":"")+fmtKg(dl)+" since "+fmtShort(pts[0].date)):null));
-      }else row.append(el("div",{class:"v"},"–"));
+      const hist=sessions.filter(s=>doneSets(s.entries[e.id]).length);
+      const row=el("div",{class:"trend"});
+      if(!hist.length){row.append(el("div",{class:"nm"},e.n,el("small",{},"Not logged yet")),el("span",{}),el("div",{class:"v"},"–"));panel.append(row);return}
+      const first=hist[0],last=hist[hist.length-1],bs=bestSet(e,last);
+      const scores=hist.map(s=>sessionScore(e,s)).filter(v=>v!=null);
+      const pct=scores.length>1?(scores[scores.length-1]/scores[0]-1)*100:null;
+      const limit=atPlateLimit(e,last,d);
+      row.append(el("div",{class:"nm"},e.n,el("small",{},`${hist.length} session${hist.length>1?"s":""}`+(limit?"":"")),limit?el("span",{class:"chip warn"},"At plate limit"):null),
+        scores.length>=2?sparkSVG(scores,92,28,3):el("span",{}),
+        el("div",{class:"v"},e.load==="kg"&&bs&&bs.kg!=null?`${fmtKg(bs.kg)} kg × ${bs.reps??"–"}`:`${bs&&bs.reps!=null?bs.reps:"–"} reps`,
+          pct!=null?el("span",{class:"d "+(pct>0.5?"pos":pct<-0.5?"neg":"flat")},signed(pct,0,"%")+" since "+fmtShort(first.date)):null));
       panel.append(row);
     });
     m.append(panel);
   });
+  if(allExercises().some(e=>{const h=sessions.filter(s=>doneSets(s.entries[e.id]).length);return h.length&&atPlateLimit(e,h[h.length-1],Object.keys(PLAN).find(k=>PLAN[k].ex.includes(e)))}))
+    m.append(el("p",{class:"notice"},el("b",{},"Some lifts are at your plates' limit. "),"Keep progressing them with extra reps or a slower 3–4 second lowering, and consider more 2.5 kg plates so the weight can keep rising."));
+
   m.append(el("section",{class:"panel"},el("h2",{},"Your data"),
     el("p",{class:"hint"},"Download a copy for your records or a spreadsheet."),
     el("div",{class:"row"},
@@ -514,23 +637,49 @@ function renderProgress(){
       el("button",{type:"button",class:"btn",onclick:()=>exportFile("backup")},"Full backup (JSON)"))));
 }
 
-function bodyChart(rows){
-  const W=600,H=200,P={l:38,r:12,t:12,b:24};const ns="http://www.w3.org/2000/svg";
-  const s=document.createElementNS(ns,"svg");s.setAttribute("viewBox",`0 0 ${W} ${H}`);s.setAttribute("class","chart");s.setAttribute("role","img");
-  const vals=rows.map(r=>r.weight);let lo=Math.floor(Math.min(...vals)-0.5),hi=Math.ceil(Math.max(...vals)+0.5);if(hi-lo<2){hi+=1;lo-=1}
-  const t0=new Date(rows[0].date).getTime(),t1=new Date(rows[rows.length-1].date).getTime(),tr=t1-t0||1;
-  const X=d=>P.l+(new Date(d).getTime()-t0)/tr*(W-P.l-P.r),Y=v=>P.t+(hi-v)/(hi-lo)*(H-P.t-P.b);
-  s.setAttribute("aria-label",`Bodyweight from ${rows[0].weight} kg to ${rows[rows.length-1].weight} kg`);
-  const step=Math.max(1,Math.ceil((hi-lo)/4));
-  for(let v=lo;v<=hi;v+=step){const g=document.createElementNS(ns,"line");g.setAttribute("x1",P.l);g.setAttribute("x2",W-P.r);g.setAttribute("y1",Y(v));g.setAttribute("y2",Y(v));g.setAttribute("stroke","var(--line)");s.append(g);
-    const t=document.createElementNS(ns,"text");t.setAttribute("x",P.l-6);t.setAttribute("y",Y(v)+4);t.setAttribute("text-anchor","end");t.textContent=v;s.append(t)}
-  [rows[0],rows[rows.length-1]].forEach((r,i)=>{const t=document.createElementNS(ns,"text");t.setAttribute("x",i?W-P.r:P.l);t.setAttribute("y",H-6);t.setAttribute("text-anchor",i?"end":"start");t.textContent=fmtShort(r.date);s.append(t)});
-  const area=document.createElementNS(ns,"path");
-  area.setAttribute("d","M"+rows.map(r=>X(r.date)+","+Y(r.weight)).join("L")+`L${X(rows[rows.length-1].date)},${H-P.b}L${X(rows[0].date)},${H-P.b}Z`);
-  area.setAttribute("fill","var(--accent-soft)");s.append(area);
-  const line=document.createElementNS(ns,"polyline");line.setAttribute("points",rows.map(r=>X(r.date)+","+Y(r.weight)).join(" "));line.setAttribute("fill","none");line.setAttribute("stroke","var(--accent)");line.setAttribute("stroke-width","2.2");line.setAttribute("stroke-linejoin","round");s.append(line);
-  rows.forEach((r,i)=>{const c=document.createElementNS(ns,"circle");c.setAttribute("cx",X(r.date));c.setAttribute("cy",Y(r.weight));c.setAttribute("r",i===rows.length-1?4.5:2.5);c.setAttribute("fill","var(--accent)");s.append(c)});
-  return s;
+/* ---------- this session: live progress and summary ---------- */
+function sessionStats(){
+  const p=PLAN[S.day],entries=(S.draft&&S.draft.entries)||{};
+  let total=0,done=0,exDone=0,vol=0;
+  p.ex.forEach(e=>{
+    const d=doneSets(entries[e.id]).length;total+=e.sets;done+=Math.min(d,e.sets);if(d>=e.sets)exDone++;
+    doneSets(entries[e.id]).forEach(s=>{if(e.load==="kg"&&s.kg!=null&&s.reps)vol+=s.kg*s.reps*(e.unit==="per hand"?2:1)});
+  });
+  return {total,done,exDone,exTotal:p.ex.length,vol};
+}
+function sessionVolume(sess,day,only){
+  let v=0;PLAN[day].ex.filter(e=>!only||only.has(e.id)).forEach(e=>doneSets(sess.entries&&sess.entries[e.id]).forEach(s=>{if(e.load==="kg"&&s.kg!=null&&s.reps)v+=s.kg*s.reps*(e.unit==="per hand"?2:1)}));return v;
+}
+function updateSession(){
+  const bar=$("#sessbar"),sum=$("#sess-sum");if(!bar||!sum)return;
+  const st=sessionStats();
+  bar.replaceChildren(
+    el("div",{class:"sb-txt"},el("b",{class:"num"},`${st.done} of ${st.total} sets`),el("span",{},`${st.exDone} of ${st.exTotal} exercises done`)),
+    (()=>{const t=el("div",{class:"sb-track"}),f=el("div",{class:"sb-fill"});f.style.width=(st.total?st.done/st.total*100:0)+"%";t.append(f);return t})());
+  sum.replaceChildren();sum.hidden=!st.done;if(!st.done)return;
+  const cur={entries:S.draft.entries},p=PLAN[S.day];
+  const prevSame=sessionsSorted().filter(s=>s.day===S.day&&(s.date+"_"+s.day)!==sid()&&s.date<=S.date&&Object.values(s.entries||{}).some(x=>doneSets(x).length)).pop();
+  const history=sessionsSorted().filter(s=>(s.date+"_"+s.day)!==sid()&&s.date<=S.date);
+  const bests=[],ready=[],limits=[];
+  p.ex.forEach(e=>{
+    const v=sessionScore(e,cur);if(v==null)return;
+    const before=history.map(s=>sessionScore(e,s)).filter(x=>x!=null);
+    if(before.length&&v>Math.max(...before)+1e-9){const b=bestSet(e,cur);bests.push(e.load==="kg"?`${e.n} (${fmtKg(b.kg)} × ${b.reps})`:`${e.n} (${b.reps} reps)`)}
+    if(readyToProgress(e,cur)===true)(atPlateLimit(e,cur,S.day)?limits:ready).push(e.n);
+  });
+  const items=[];
+  if(st.vol)items.push(el("li",{},el("b",{},"Total lifted: "),`${fmtInt(st.vol)} kg`+(prevSame?(()=>{
+    // compare only the exercises done so far, so a half-finished session isn't measured against a full one
+    const doneIds=new Set(p.ex.filter(e=>doneSets(S.draft.entries[e.id]).length).map(e=>e.id));
+    const pv=sessionVolume(prevSame,S.day,doneIds);
+    if(!pv)return "";const pc=Math.round((st.vol/pv-1)*100);
+    return pc?`, ${signed(pc,0,"%")} vs the same exercises on ${fmtShort(prevSame.date)}`:`, level with the same exercises on ${fmtShort(prevSame.date)}`;
+  })():"")));
+  if(bests.length)items.push(el("li",{},el("b",{},"New bests: "),bests.join(", ")));
+  if(ready.length)items.push(el("li",{},el("b",{},"Add 2.5 kg next time: "),ready.join(", ")));
+  if(limits.length)items.push(el("li",{},el("b",{},"At your plates' limit: "),limits.join(", ")+". Add reps or slow the lowering instead."));
+  sum.append(el("h2",{},st.done>=st.total?"Session complete":"So far this session"),
+    items.length?el("ul",{},items):el("p",{class:"hint"},"Tick sets as you go and your summary builds here."));
 }
 
 function renderBody(){
@@ -558,15 +707,8 @@ function renderBody(){
 function renderBodyLists(){
   const box=$("#body-lists");if(!box)return;box.replaceChildren();
   const rows=Object.values(S.body).sort((a,b)=>a.date<b.date?-1:1);
-  const w=rows.filter(r=>r.weight!=null);
-  const chart=el("section",{class:"panel"},el("h2",{},"Bodyweight"));
-  if(w.length>=2){
-    const days=(new Date(w[w.length-1].date)-new Date(w[0].date))/864e5;
-    const perMonth=days>0?(w[w.length-1].weight-w[0].weight)/days*30.4:0;
-    const verdict=days<21?"Keep logging; the trend needs about three weeks.":perMonth<0.25?"Below target. Eat a little more.":perMonth>0.75?"Faster than needed; some of it may be fat.":"On target for lean gain.";
-    chart.append(el("p",{class:"hint"},el("b",{class:"num"},(perMonth>=0?"+":"")+perMonth.toFixed(2)+" kg/month")," · goal +0.25 to +0.5. ",verdict),bodyChart(w));
-  }else chart.append(el("p",{class:"empty"},w.length?"One weigh-in so far. The chart starts with your second.":"No weigh-ins yet. Log your first one above."));
-  box.append(chart);
+  box.append(el("div",{class:"row"},el("span",{class:"hint"},"Your bodyweight and measurement charts are on the Progress tab."),
+    el("button",{type:"button",class:"btn",onclick:()=>setTab("progress")},"See charts")));
   if(rows.length){
     const tb=el("tbody");rows.slice().reverse().forEach(r=>tb.append(el("tr",{},el("td",{},fmtShort(r.date)),el("td",{},fmtKg(r.weight)),el("td",{},fmtKg(r.arm)),el("td",{},fmtKg(r.chest)),el("td",{},fmtKg(r.waist)),el("td",{},r.photo?"✓":""))));
     box.append(el("section",{class:"panel"},el("h2",{},"History"),el("div",{class:"tablewrap"},el("table",{class:"hist"},el("thead",{},el("tr",{},["Date","kg","Arm","Chest","Waist","Photo"].map(h=>el("th",{},h)))),tb))));
@@ -574,6 +716,7 @@ function renderBodyLists(){
 }
 
 function render(){
+  const hdr=document.querySelector("header");if(hdr)document.documentElement.style.setProperty("--hdr",hdr.offsetHeight+"px");
   document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===S.tab)));
   ({log:renderLog,play:renderPlay,progress:renderProgress,body:renderBody})[S.tab]();
   syncWake();
@@ -610,11 +753,11 @@ function zoneBar(z){
 }
 
 function hrTrace(p,max){
-  const ns="http://www.w3.org/2000/svg",W=600,H=140,P={l:34,r:8,t:8,b:20};
+  const ns="http://www.w3.org/2000/svg",W=chartW(),H=150,P={l:34,r:10,t:8,b:22};
   const pts=p.hr.map((v,i)=>v==null?null:[i,v]).filter(Boolean);if(pts.length<2)return null;
   const lo=Math.max(40,Math.floor(Math.min(...pts.map(q=>q[1]))/20)*20),hi=Math.ceil(Math.max(...pts.map(q=>q[1]),max*.9)/20)*20;
   const n=p.hr.length-1||1;const X=i=>P.l+i/n*(W-P.l-P.r),Y=v=>P.t+(hi-v)/(hi-lo)*(H-P.t-P.b);
-  const s=document.createElementNS(ns,"svg");s.setAttribute("viewBox",`0 0 ${W} ${H}`);s.setAttribute("class","chart");s.setAttribute("role","img");
+  const s=document.createElementNS(ns,"svg");s.setAttribute("viewBox",`0 0 ${W} ${H}`);s.setAttribute("width",W);s.setAttribute("height",H);s.setAttribute("class","chart");s.setAttribute("role","img");
   s.setAttribute("aria-label",`Heart rate during the session, average ${p.avgHr}, max ${p.maxHr} bpm`);
   const mk=(tag,a)=>{const e=document.createElementNS(ns,tag);for(const k in a)e.setAttribute(k,a[k]);return e};
   // zone bands
@@ -647,17 +790,17 @@ function playCard(p,max){
 }
 
 function weeklyChart(weeks){
-  const ns="http://www.w3.org/2000/svg",W=600,H=170,P={l:30,r:8,t:12,b:24};
+  const ns="http://www.w3.org/2000/svg",W=chartW(),H=170,P={l:30,r:8,t:14,b:24};
   const mk=(tag,a)=>{const e=document.createElementNS(ns,tag);for(const k in a)e.setAttribute(k,a[k]);return e};
   const maxH=Math.max(4,Math.ceil(Math.max(...weeks.map(w=>w.min/60))));
-  const s=mk("svg",{viewBox:`0 0 ${W} ${H}`,class:"chart",role:"img","aria-label":"Hours of tennis per week, last 8 weeks"});
+  const s=mk("svg",{viewBox:`0 0 ${W} ${H}`,width:W,height:H,class:"chart",role:"img","aria-label":"Hours of tennis per week, last 8 weeks"});
   const bw=(W-P.l-P.r)/weeks.length,Y=v=>P.t+(maxH-v)/maxH*(H-P.t-P.b);
   const step=maxH>8?2:1;
   for(let v=0;v<=maxH;v+=step){s.append(mk("line",{x1:P.l,x2:W-P.r,y1:Y(v),y2:Y(v),stroke:"var(--line)"}));const t=mk("text",{x:P.l-6,y:Y(v)+4,"text-anchor":"end"});t.textContent=v+"h";s.append(t)}
   weeks.forEach((w,i)=>{const h=w.min/60,x=P.l+i*bw+bw*.18,wd=bw*.64;
     if(h>0)s.append(mk("rect",{x,y:Y(h),width:wd,height:Y(0)-Y(h),rx:3,fill:i===weeks.length-1?"var(--accent)":"var(--accent-soft)",stroke:"var(--accent)","stroke-width":i===weeks.length-1?0:1}));
     if(w.n){const t=mk("text",{x:x+wd/2,y:Y(h)-5,"text-anchor":"middle"});t.textContent=w.n+"×";s.append(t)}
-    const t=mk("text",{x:x+wd/2,y:H-6,"text-anchor":"middle"});t.textContent=i===weeks.length-1?"This wk":fmtShort(w.start);s.append(t)});
+    const t=mk("text",{x:x+wd/2,y:H-6,"text-anchor":"middle"});t.textContent=i===weeks.length-1?"Now":shortDM(w.start);s.append(t)});
   return s;
 }
 
@@ -913,6 +1056,8 @@ document.addEventListener("visibilitychange",()=>{
   syncWake();
 });
 window.addEventListener("pagehide",saveNow);
+let resizeT=null,lastW=window.innerWidth;
+window.addEventListener("resize",()=>{clearTimeout(resizeT);resizeT=setTimeout(()=>{if(Math.abs(window.innerWidth-lastW)<40)return;lastW=window.innerWidth;if(S.tab!=="log")render()},250)});
 
 if("serviceWorker" in navigator){
   window.addEventListener("load",()=>{navigator.serviceWorker.register("/log/sw.js",{scope:"/log/"}).catch(()=>{})});
