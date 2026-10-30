@@ -232,65 +232,71 @@ function howBlock(e){
 }
 
 /* ---------- dumbbell plates ----------
-   Kit: two spin-lock handles, 8 × 2.5 kg and 8 × 1.25 kg plates. Plates go on in
-   matching pairs (same on each side). Loading both dumbbells the same means each
-   dumbbell can take at most 2 of each plate per side; one dumbbell can take 4. */
-const PLATES={big:2.5,small:1.25,count:8};
-function handleKg(){try{const v=parseFloat(localStorage.getItem("tft:handle"));return v>0&&v<10?v:2}catch(e){return 2}}
-function setHandleKg(v){try{localStorage.setItem("tft:handle",String(v))}catch(e){}}
-const perSideMax=kit=>kit==="one"?PLATES.count/2:PLATES.count/4;
-function loadKg(l){return handleKg()+2*(l.big*PLATES.big+l.small*PLATES.small)}
+   Kit: two spin-lock handles (1.6 kg each with collars) and the plates below. Plates go
+   on in matching pairs (same on each side), so loading both dumbbells the same allows
+   a quarter of each plate size per side; a single dumbbell can take half. */
+const PLATE_TYPES=[{key:"big",kg:2.5,count:8},{key:"mid",kg:1.25,count:4},{key:"small",kg:0.5,count:4}];
+const DEFAULT_HANDLE_KG=1.6;
+function handleKg(){try{const v=parseFloat(localStorage.getItem("tft:handle-kg"));return v>0&&v<10?v:DEFAULT_HANDLE_KG}catch(e){return DEFAULT_HANDLE_KG}}
+function setHandleKg(v){try{localStorage.setItem("tft:handle-kg",String(v))}catch(e){}}
+const perSideMax=(kit,t)=>Math.floor(t.count/(kit==="one"?2:4));
+const emptyLoad=()=>Object.fromEntries(PLATE_TYPES.map(t=>[t.key,0]));
+function loadKg(l){return handleKg()+2*PLATE_TYPES.reduce((a,t)=>a+(l[t.key]||0)*t.kg,0)}
+// every way to load one dumbbell for this kit (pair or single)
+function allLoads(kit){
+  let out=[emptyLoad()];
+  for(const t of PLATE_TYPES){const m=perSideMax(kit,t),next=[];for(const l of out)for(let n=0;n<=m;n++)next.push({...l,[t.key]:n});out=next}
+  return out;
+}
 // best loading for a target weight per dumbbell: closest, then fewest plates
 function bestLoad(target,kit){
-  const m=perSideMax(kit);let best=null;
-  for(let b=0;b<=m;b++)for(let s=0;s<=m;s++){
-    const l={big:b,small:s},kg=loadKg(l),d=Math.abs(kg-target),n=b+s;
-    if(!best||d<best.d-1e-9||(Math.abs(d-best.d)<1e-9&&n<best.n))best={...l,kg,d,n};
+  let best=null;
+  for(const l of allLoads(kit)){
+    const d=Math.abs(loadKg(l)-target),n=PLATE_TYPES.reduce((a,t)=>a+l[t.key],0);
+    if(!best||d<best.d-1e-9||(Math.abs(d-best.d)<1e-9&&n<best.n))best={l,d,n};
   }
-  return {big:best.big,small:best.small};
+  return best.l;
 }
-function reachable(kit){
-  const m=perSideMax(kit),set=new Set();
-  for(let b=0;b<=m;b++)for(let s=0;s<=m;s++)set.add(Math.round(loadKg({big:b,small:s})*100)/100);
-  return [...set].sort((a,b)=>a-b);
-}
-const sideText=l=>{const p=[];for(let i=0;i<l.big;i++)p.push("2.5");for(let i=0;i<l.small;i++)p.push("1.25");return p.length?p.join(" + ")+" each side":"no plates"};
+function reachable(kit){return [...new Set(allLoads(kit).map(l=>Math.round(loadKg(l)*100)/100))].sort((a,b)=>a-b)}
+// the next heavier weight your plates allow, or null at the limit
+const nextLoadKg=(kg,kit)=>reachable(kit).find(v=>v>kg+0.05)??null;
+const sideText=l=>{const p=PLATE_TYPES.flatMap(t=>Array(l[t.key]||0).fill(String(t.kg)));return p.length?p.join(" + ")+" each side":"no plates"};
 
 function dumbbellSVG(l){
   const W=320,H=96,cx=W/2,mk=svgEl;
   const s=mk("svg",{viewBox:`0 0 ${W} ${H}`,class:"dbsvg",role:"img","aria-label":`Dumbbell loaded with ${sideText(l)}`});
-  const grip=64,bigW=14,smallW=10,gap=2;
+  const grip=64,gap=2,size={big:[14,80],mid:[10,62],small:[7,46]};
   s.append(mk("rect",{x:20,y:H/2-4,width:W-40,height:8,rx:3,class:"db-bar"}));
   s.append(mk("rect",{x:cx-grip/2,y:H/2-6,width:grip,height:12,rx:4,class:"db-grip"}));
   [-1,1].forEach(dir=>{
     let x=cx+dir*(grip/2+6);
     s.append(mk("rect",{x:dir<0?x-4:x,y:H/2-11,width:4,height:22,rx:1,class:"db-collar"}));x+=dir*6;
-    const plates=[...Array(l.big).fill("big"),...Array(l.small).fill("small")];
-    plates.forEach(p=>{const w=p==="big"?bigW:smallW,h=p==="big"?80:60;
-      s.append(mk("rect",{x:dir<0?x-w:x,y:(H-h)/2,width:w,height:h,rx:3,class:"db-plate "+p}));x+=dir*(w+gap)});
+    // heaviest plates go on first, nearest the grip
+    PLATE_TYPES.forEach(t=>{for(let i=0;i<(l[t.key]||0);i++){const [w,h]=size[t.key];
+      s.append(mk("rect",{x:dir<0?x-w:x,y:(H-h)/2,width:w,height:h,rx:3,class:"db-plate "+t.key}));x+=dir*(w+gap)}});
     s.append(mk("rect",{x:dir<0?x-6:x,y:H/2-9,width:6,height:18,rx:2,class:"db-nut"}));
   });
   return s;
 }
 
 /* the calculator sheet: one loading, edited either by target weight or plate by plate */
-const Calc={kit:"pair",l:{big:0,small:0}};
+const Calc={kit:"pair",l:emptyLoad()};
 function openCalc(kg,kit){
   Calc.kit=kit==="one"?"one":"pair";
-  Calc.l=kg!=null?bestLoad(kg,Calc.kit):{big:0,small:0};
+  Calc.l=kg!=null?bestLoad(kg,Calc.kit):emptyLoad();
   renderCalc();const d=$("#calc");if(!d.open){try{d.showModal()}catch(e){d.setAttribute("open","")}}
 }
 function renderCalc(){
   const box=$("#calc-body");box.replaceChildren();
-  const m=perSideMax(Calc.kit);Calc.l.big=Math.min(Calc.l.big,m);Calc.l.small=Math.min(Calc.l.small,m);
+  PLATE_TYPES.forEach(t=>{Calc.l[t.key]=Math.min(Calc.l[t.key]||0,perSideMax(Calc.kit,t))});
   const kg=loadKg(Calc.l),opts=reachable(Calc.kit);
   const step=dir=>{const i=opts.findIndex(v=>v>=kg-1e-9);const j=Math.max(0,Math.min(opts.length-1,i+dir));Calc.l=bestLoad(opts[j],Calc.kit);renderCalc()};
-  const counter=(key,label)=>el("div",{class:"pc-row"},
+  const counter=t=>{const key=t.key,label=t.kg+" kg";return el("div",{class:"pc-row"},
     el("span",{class:"pc-lbl"},el("i",{class:"pc-swatch "+key}),label),
     el("button",{type:"button",class:"pc-btn","aria-label":"Remove a "+label+" plate from each side",disabled:Calc.l[key]===0||null,onclick:()=>{Calc.l[key]--;renderCalc()}},"−"),
     el("b",{class:"num pc-n"},String(Calc.l[key])),
-    el("button",{type:"button",class:"pc-btn","aria-label":"Add a "+label+" plate to each side",disabled:Calc.l[key]>=m||null,onclick:()=>{Calc.l[key]++;renderCalc()}},"+"));
-  const used=k=>Calc.l[k]*2*(Calc.kit==="pair"?2:1);
+    el("button",{type:"button",class:"pc-btn","aria-label":"Add a "+label+" plate to each side",disabled:Calc.l[key]>=perSideMax(Calc.kit,t)||null,onclick:()=>{Calc.l[key]++;renderCalc()}},"+"))};
+  const used=t=>`${Calc.l[t.key]*2*(Calc.kit==="pair"?2:1)} of ${t.count} × ${t.kg} kg`;
   box.append(
     el("div",{class:"seg",role:"group","aria-label":"Dumbbells"},
       ["pair","one"].map(k=>el("button",{type:"button","aria-pressed":String(Calc.kit===k),onclick:()=>{Calc.kit=k;Calc.l=bestLoad(kg,k);renderCalc()}},k==="pair"?"Both dumbbells":"One dumbbell"))),
@@ -300,8 +306,8 @@ function renderCalc(){
       el("button",{type:"button",class:"pc-big","aria-label":"Heavier",disabled:kg>=opts[opts.length-1]-1e-9||null,onclick:()=>step(1)},"+")),
     dumbbellSVG(Calc.l),
     el("p",{class:"pc-recipe"},el("b",{},"Load: "),sideText(Calc.l)+(Calc.kit==="pair"?", on both dumbbells":"")),
-    el("div",{class:"pc-counters"},counter("big","2.5 kg"),counter("small","1.25 kg")),
-    el("p",{class:"hint"},`Using ${used("big")} of 8 × 2.5 kg and ${used("small")} of 8 × 1.25 kg plates.`+(Calc.kit==="pair"?` Pair total ${fmtKg(kg*2)} kg.`:"")),
+    el("div",{class:"pc-counters"},PLATE_TYPES.map(counter)),
+    el("p",{class:"hint"},`Using ${PLATE_TYPES.map(used).join(", ")} plates.`+(Calc.kit==="pair"?` Pair total ${fmtKg(kg*2)} kg.`:"")),
     el("label",{class:"pc-handle",for:"calc-handle"},"Handle weight",
       el("div",{class:"field"},el("input",{type:"number",id:"calc-handle",inputmode:"decimal",step:"0.05",min:"0.5",max:"9",value:handleKg(),
         onchange:e=>{const v=parseFloat(e.target.value);if(v>0&&v<10){setHandleKg(v);e.target.blur();requestAnimationFrame(()=>{renderCalc();if(S.tab==="log")renderLog()})}}}),el("i",{},"kg"))));
@@ -441,7 +447,7 @@ function exCard(e,next){
     el("div",{class:"ex-top"},el("h2",{},e.n),el("span",{class:"target"},target)),
     el("div",{class:"specs"},el("span",{},"Start ",el("b",{},e.start)," ",e.unit),el("span",{},"Rest ",el("b",{},e.rest>=120?Math.floor(e.rest/60)+(e.rest%60?":"+String(e.rest%60).padStart(2,"0"):"")+" min":e.rest+" s"))),
     last?el("div",{class:"last"},el("span",{class:"num"},fmtShort(last.date)+": "+lastTxt),
-      ready===true?(atPlateLimit(e,last,S.day)?el("span",{class:"chip warn",title:"No heavier loading possible with your plates"},"At plate limit: add reps"):el("span",{class:"chip up"},e.load==="kg"?"Add 2.5 kg":"Make it harder")):ready===false?el("span",{class:"chip hold"},"Same again"):null)
+      ready===true?(atPlateLimit(e,last,S.day)?el("span",{class:"chip warn",title:"No heavier loading possible with your plates"},"At plate limit: add reps"):el("span",{class:"chip up"},e.load==="kg"?(()=>{const lk=Math.max(...lastSets.map(s=>s.kg??0)),st=PLAN[S.day].stations[e.st],nx=nextLoadKg(lk,st&&st.kit==="one"?"one":"pair");return nx?`Up to ${fmtKg(nx)} kg`:"Go up a step"})():"Make it harder")):ready===false?el("span",{class:"chip hold"},"Same again"):null)
       :el("div",{class:"last"},"First time. Start at the low end and find your weight."),
   );
   if(e.pair&&EX[e.pair]){
@@ -553,7 +559,7 @@ function strengthSeries(){
   });
   return out;
 }
-const plateMax=kit=>loadKg({big:perSideMax(kit),small:perSideMax(kit)});
+const plateMax=kit=>Math.max(...reachable(kit));
 function atPlateLimit(e,sess,day){
   if(e.load!=="kg"||!sess)return false;
   const st=PLAN[day]&&PLAN[day].stations[e.st];const kit=st&&st.kit==="one"?"one":"pair";
@@ -679,7 +685,7 @@ function updateSession(){
     return pc?`, ${signed(pc,0,"%")} vs the same exercises on ${fmtShort(prevSame.date)}`:`, level with the same exercises on ${fmtShort(prevSame.date)}`;
   })():"")));
   if(bests.length)items.push(el("li",{},el("b",{},"New bests: "),bests.join(", ")));
-  if(ready.length)items.push(el("li",{},el("b",{},"Add 2.5 kg next time: "),ready.join(", ")));
+  if(ready.length)items.push(el("li",{},el("b",{},"Go up a weight next time: "),ready.join(", ")));
   if(limits.length)items.push(el("li",{},el("b",{},"At your plates' limit: "),limits.join(", ")+". Add reps or slow the lowering instead."));
   sum.append(el("h2",{},st.done>=st.total?"Session complete":"So far this session"),
     items.length?el("ul",{},items):el("p",{class:"hint"},"Tick sets as you go and your summary builds here."));
