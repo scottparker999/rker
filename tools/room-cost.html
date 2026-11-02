@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Room cost and rate floor — rker.me</title>
+<meta name="description" content="What a room actually costs to sell — linen at wear and loss, not just laundry, amenities, cleaning and marginal energy. Gives a rate floor that varies by length of stay, and shows why cost per occupied room is the wrong number to price against. Runs entirely in your browser.">
+<link rel="canonical" href="https://rker.me/tools/room-cost">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Room cost and rate floor">
+<meta property="og:description" content="Cost per occupied room falls as you fill up. That is arithmetic, not a saving — and it is the wrong number to price against.">
+<meta property="og:url" content="https://rker.me/tools/room-cost">
+<meta property="og:image" content="https://rker.me/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="stylesheet" href="/fonts.css">
+<link rel="stylesheet" href="/site.css">
+<link rel="stylesheet" href="/tools/tools.css">
+<noscript><style>.reveal{opacity:1 !important;transform:none !important}</style></noscript>
+
+</head>
+<body>
+<div class="wrap tool-wrap">
+
+  <header class="topbar">
+    <a class="home" href="/">P<span class="at">@</span>rker</a>
+    <nav aria-label="Pages">
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/writing/">writing</a>
+      <a class="u" href="/tools/" aria-current="page">tools</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </header>
+
+  <main>
+    <p class="eyebrow reveal">Tool</p>
+    <h1 class="reveal">The lowest rate worth taking.</h1>
+    <p class="lede reveal narrow">
+      Linen, amenities and the clean are consumed per stay. Energy and water are consumed per night.
+      So a room doesn't have a cost — it has a curve, and your floor moves with length of stay.
+    </p>
+
+    <noscript>
+      <p class="draft">This calculator needs JavaScript. It runs entirely in your browser — nothing is sent anywhere.</p>
+    </noscript>
+
+    <form id="calc" autocomplete="off">
+
+      <section class="section reveal">
+        <h2>The property</h2>
+        <div>
+          <p>
+            Fixed costs are everything that doesn't change when you sell one more room — management,
+            public areas, insurance, rates, base energy, maintenance. They matter for the cost per
+            occupied room and not at all for the floor.
+          </p>
+          <div class="field-grid">
+            <label>
+              <span>Currency</span>
+              <select id="currency">
+                <option value="AUD" selected>AUD — Australian dollar</option>
+                <option value="NZD">NZD — New Zealand dollar</option>
+                <option value="USD">USD — US dollar</option>
+                <option value="GBP">GBP — Pound sterling</option>
+                <option value="EUR">EUR — Euro</option>
+                <option value="SGD">SGD — Singapore dollar</option>
+              </select>
+            </label>
+            <label>
+              <span>Sellable units</span>
+              <input type="number" id="rooms" value="120" min="1" step="1" inputmode="numeric">
+            </label>
+            <label>
+              <span>Days in the period</span>
+              <input type="number" id="periodDays" value="365" min="1" step="1" inputmode="numeric">
+            </label>
+            <label>
+              <span>Occupancy</span>
+              <input type="number" id="occupancyPct" value="72" min="0" max="100" step="0.1" inputmode="decimal">
+            </label>
+            <label>
+              <span>Average length of stay</span>
+              <input type="number" id="averageLengthOfStay" value="2.6" min="1" step="0.1" inputmode="decimal">
+              <small>Nights.</small>
+            </label>
+            <label>
+              <span>Fixed costs for the period</span>
+              <input type="number" id="fixedCostsPerPeriod" value="1650000" min="0" step="1000" inputmode="decimal">
+              <small>Everything that doesn't move with occupancy.</small>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal">
+        <h2>Cleaning</h2>
+        <div>
+          <p>
+            The departure clean lands once per stay; the stayover service lands on the nights in
+            between. Use a fully loaded hourly rate — base, on-costs and the productivity allowance
+            all in — or work it out properly in the
+            <a class="u" href="/tools/housekeeping-labour">housekeeping model</a>.
+          </p>
+          <div class="field-grid">
+            <label>
+              <span>Departure clean, minutes</span>
+              <input type="number" id="departureCleanMinutes" value="45" min="0" step="1" inputmode="decimal">
+            </label>
+            <label>
+              <span>Stayover service, minutes</span>
+              <input type="number" id="stayoverMinutes" value="15" min="0" step="1" inputmode="decimal">
+            </label>
+            <label>
+              <span>Stayover servicing</span>
+              <select id="serviceFrequency"></select>
+            </label>
+            <label>
+              <span>Guests declining service</span>
+              <input type="number" id="optOutPct" value="20" min="0" max="100" step="1" inputmode="decimal">
+            </label>
+            <label>
+              <span>Loaded hourly rate</span>
+              <input type="number" id="loadedHourlyRate" value="40" min="0" step="0.01" inputmode="decimal">
+              <small>Including on-costs.</small>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal">
+        <h2>Linen</h2>
+        <div>
+          <p>
+            Laundry is roughly half of what linen costs. The rest is <strong>wear</strong> — a set
+            has a finite number of washes in it, and every changeover spends a slice of that — and
+            <strong>loss</strong> to stains, tears and suitcases. Leave those out and your
+            replacement budget is a surprise every year instead of a line item.
+          </p>
+          <div class="field-grid">
+            <label>
+              <span>Cost of a full set</span>
+              <input type="number" id="linen_setCost" value="120" min="0" step="0.01" inputmode="decimal">
+              <small>Sheets, cases, towels for one unit.</small>
+            </label>
+            <label>
+              <span>Washes before retirement</span>
+              <input type="number" id="linen_washesBeforeRetire" value="75" min="0" step="1" inputmode="numeric">
+            </label>
+            <label>
+              <span>Loss and damage per wash</span>
+              <input type="number" id="linen_lossPctPerWash" value="0.4" min="0" max="100" step="0.1" inputmode="decimal">
+              <small>% of set value written off.</small>
+            </label>
+            <label>
+              <span>Laundry per set</span>
+              <input type="number" id="linen_laundryPerSet" value="3.10" min="0" step="0.01" inputmode="decimal">
+              <small>In-house cost or contract price.</small>
+            </label>
+            <label>
+              <span>Mid-stay change every</span>
+              <input type="number" id="linen_changeEveryNights" value="3" min="0" step="1" inputmode="numeric">
+              <small>Nights. Zero for never.</small>
+            </label>
+            <label>
+              <span>Mid-stay change is</span>
+              <input type="number" id="linen_midStayFractionPct" value="40" min="0" max="100" step="1" inputmode="decimal">
+              <small>% of a full changeover — usually towels only.</small>
+            </label>
+            <label>
+              <span>Par level</span>
+              <input type="number" id="linen_parLevel" value="3" min="0" step="0.5" inputmode="decimal">
+              <small>Sets per unit, for capital tied up.</small>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal">
+        <h2>Consumables and utilities</h2>
+        <div>
+          <p>
+            Energy here is the <strong>marginal</strong> draw of a sold room, not the meter divided
+            by room nights — the base load runs whether or not anybody is in it, and belongs in
+            fixed costs above.
+          </p>
+          <div class="field-grid">
+            <label>
+              <span>Amenities per stay</span>
+              <input type="number" id="amenitiesPerStay" value="4.20" min="0" step="0.01" inputmode="decimal">
+              <small>Replaced at turn regardless of use.</small>
+            </label>
+            <label>
+              <span>Amenities per night</span>
+              <input type="number" id="amenitiesPerNight" value="0.90" min="0" step="0.01" inputmode="decimal">
+              <small>Tea, coffee, water, topped up.</small>
+            </label>
+            <label>
+              <span>Amenity waste</span>
+              <input type="number" id="amenityWastePct" value="15" min="0" max="200" step="1" inputmode="decimal">
+              <small>% thrown out part-used.</small>
+            </label>
+            <label>
+              <span>Marginal energy per night</span>
+              <input type="number" id="marginalKwhPerNight" value="9.8" min="0" step="0.1" inputmode="decimal">
+              <small>kWh above base load.</small>
+            </label>
+            <label>
+              <span>Tariff</span>
+              <input type="number" id="tariffPerKwh" value="0.31" min="0" step="0.001" inputmode="decimal">
+              <small>Per kWh, all in.</small>
+            </label>
+            <label>
+              <span>Seasonal multiplier</span>
+              <input type="number" id="seasonalMultiplier" value="1" min="0" step="0.05" inputmode="decimal">
+              <small>1.9 for a Queensland January.</small>
+            </label>
+            <label>
+              <span>Water per night</span>
+              <input type="number" id="litresPerNight" value="180" min="0" step="5" inputmode="decimal">
+              <small>Litres.</small>
+            </label>
+            <label>
+              <span>Water and sewerage</span>
+              <input type="number" id="costPerKilolitre" value="3.40" min="0" step="0.01" inputmode="decimal">
+              <small>Per kilolitre.</small>
+            </label>
+            <label>
+              <span>Other per stay</span>
+              <input type="number" id="otherPerStay" value="0" min="0" step="0.01" inputmode="decimal">
+            </label>
+            <label>
+              <span>Other per night</span>
+              <input type="number" id="otherPerNight" value="0" min="0" step="0.01" inputmode="decimal">
+            </label>
+          </div>
+        </div>
+      </section>
+    </form>
+
+    <section class="section reveal">
+      <h2>The floor</h2>
+      <div>
+        <div id="warnings" role="status" aria-live="polite"></div>
+
+        <div class="verdict" id="verdict">
+          <p class="verdict-call" id="verdictCall">—</p>
+          <p class="verdict-net" id="verdictNet"></p>
+          <p class="verdict-why" id="verdictWhy"></p>
+        </div>
+
+        <dl class="figures" id="figures"></dl>
+
+        <div class="table-scroll">
+          <table class="grid results">
+            <caption>Floor by length of stay</caption>
+            <thead>
+              <tr>
+                <th scope="col">Nights</th>
+                <th scope="col">Season floor</th>
+                <th scope="col">Tonight's floor</th>
+                <th scope="col">Stay total, season</th>
+              </tr>
+            </thead>
+            <tbody id="floorRows"></tbody>
+          </table>
+        </div>
+
+        <form id="rateCheck" autocomplete="off">
+          <div class="field-grid">
+            <label>
+              <span>Test a rate</span>
+              <input type="number" id="testRate" value="89" min="0" step="0.01" inputmode="decimal">
+            </label>
+            <label>
+              <span>For a stay of</span>
+              <input type="number" id="testNights" value="1" min="1" step="1" inputmode="numeric">
+              <small>Nights.</small>
+            </label>
+          </div>
+        </form>
+        <p class="fineprint" id="rateVerdict"></p>
+
+        <p class="row-actions no-print">
+          <button class="btn" type="button" id="print">↓ Save as PDF</button>
+        </p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <h2>Cost per occupied room</h2>
+      <div>
+        <p>
+          The number that gets quoted, and the one you should not price against. Watch what happens
+          to it as occupancy changes, and what happens to the marginal cost underneath.
+        </p>
+        <div class="table-scroll">
+          <table class="grid results">
+            <caption>The same property at different occupancies</caption>
+            <thead>
+              <tr>
+                <th scope="col">Occupancy</th>
+                <th scope="col">Variable</th>
+                <th scope="col">Fixed allocation</th>
+                <th scope="col">CPOR</th>
+              </tr>
+            </thead>
+            <tbody id="cporRows"></tbody>
+          </table>
+        </div>
+        <p class="fineprint" id="cporNote"></p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <h2>Method</h2>
+      <div>
+        <p>
+          <strong>Cost per occupied room is an allocation, not a cost.</strong> Write it out and the
+          shape is obvious: it equals the per-night cost, plus the per-stay cost divided by average
+          length of stay, plus fixed cost divided by occupied room nights. Only that last term moves
+          with occupancy — and it moves because you divided by a bigger number, not because anything
+          got cheaper. Filling the house does not reduce your costs. It spreads them.
+        </p>
+        <p>
+          <strong>So the floor is a curve, not a number.</strong> Linen, amenities and the departure
+          clean are consumed once per stay; energy, water and stayover servicing are consumed every
+          night. A one-nighter carries a whole changeover on a single night's rate. A week-long stay
+          spreads it over seven. Two bookings at the same nightly rate are not the same business.
+        </p>
+        <p>
+          <strong>There are two honest floors.</strong> Tonight, with the roster published and paid,
+          cleaning labour is already spent — so the floor for a room that would otherwise go out
+          empty is just what the room burns: power, water, consumables and the linen it turns. Over
+          a season, staffing follows volume, labour is genuinely variable, and it belongs in the
+          floor. Use tonight's number for a distressed room and the season number for a rate you
+          publish, and never the other way round. The step behaviour behind the short-run figure is
+          modelled in the <a class="u" href="/tools/housekeeping-labour">housekeeping model</a>.
+        </p>
+        <p>
+          <strong>Linen is costed at wear and loss, not just laundry.</strong> A set has a finite
+          number of washes in it, so every changeover consumes a slice of the purchase price, and a
+          proportion never comes back at all. On the defaults here that's a third of the true cost,
+          sitting outside the laundry invoice where nobody sees it.
+        </p>
+        <p>
+          <strong>Energy is the marginal draw only.</strong> Dividing the electricity bill by room
+          nights buries the base load — reception, corridors, plant, the pool — in a per-room figure
+          and makes an empty night look expensive. Base load belongs in fixed costs.
+        </p>
+        <p>
+          This pairs with the <a class="u" href="/tools/ota-vs-direct">OTA vs direct calculator</a>:
+          that one tells you what a booking nets after the channel takes its cut, this one tells you
+          what it costs to honour. A booking is worth taking when the first number beats the second,
+          which is a different test from beating your ADR.
+        </p>
+        <p>
+          What this does not model: rate elasticity, so nothing here says what you <em>could</em>
+          charge; the opportunity cost of selling cheap early and displacing a better booking later,
+          which is the <a class="u" href="/tools/group-displacement">displacement calculator</a>;
+          wear on the room itself and the refurbishment cycle it pulls forward; credit card fees and
+          commission, which sit on the revenue side; and the reputational cost of a rate your
+          regulars find on a discount channel.
+        </p>
+        <p class="fineprint">
+          Everything here runs in your browser. No figures are sent anywhere, nothing is stored, and
+          there is no analytics on this page.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span><a class="u" href="/tools/">← all tools</a></span>
+    <nav aria-label="Pages">
+      <a class="u" href="/">home</a>
+      <a class="u" href="/cv">cv</a>
+      <a class="u" href="/writing/">writing</a>
+      <a class="u" href="/colophon">colophon</a>
+    </nav>
+  </footer>
+</div>
+
+<script type="module">
+  import { analyse, assessRate, SERVICE_FREQUENCIES } from '/tools/room-cost.js';
+
+  const $ = (id) => document.getElementById(id);
+
+  const FIELDS = [
+    'rooms', 'periodDays', 'occupancyPct', 'averageLengthOfStay', 'fixedCostsPerPeriod',
+    'departureCleanMinutes', 'stayoverMinutes', 'optOutPct', 'loadedHourlyRate',
+    'amenitiesPerStay', 'amenitiesPerNight', 'amenityWastePct',
+    'marginalKwhPerNight', 'tariffPerKwh', 'seasonalMultiplier',
+    'litresPerNight', 'costPerKilolitre', 'otherPerStay', 'otherPerNight',
+  ];
+  const LINEN_FIELDS = [
+    'setCost', 'washesBeforeRetire', 'lossPctPerWash', 'laundryPerSet',
+    'changeEveryNights', 'midStayFractionPct', 'parLevel',
+  ];
+
+  const n0 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+  const n1 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
+  const pctFmt = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 0 });
+  let money, money2, moneyCurrency;
+  function formatters() {
+    const currency = $('currency').value;
+    if (currency !== moneyCurrency) {
+      moneyCurrency = currency;
+      money = new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 });
+      money2 = new Intl.NumberFormat(undefined, { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+  }
+
+  function readInput() {
+    const input = { serviceFrequency: $('serviceFrequency').value, linen: {} };
+    FIELDS.forEach((id) => { input[id] = $(id).value; });
+    LINEN_FIELDS.forEach((k) => { input.linen[k] = $(`linen_${k}`).value; });
+    return input;
+  }
+
+  function figure(dl, term, value, note) {
+    const d = document.createElement('div');
+    const dt = document.createElement('dt');
+    dt.textContent = term;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    d.append(dt, dd);
+    if (note) {
+      const small = document.createElement('small');
+      small.textContent = note;
+      d.appendChild(small);
+    }
+    dl.appendChild(d);
+  }
+
+  function fillRow(tbody, cells, cls) {
+    const tr = document.createElement('tr');
+    if (cls) tr.className = cls;
+    cells.forEach((text, i) => {
+      const td = document.createElement('td');
+      td.textContent = text;
+      if (i === 0) td.classList.add('lead');
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+    return tr;
+  }
+
+  function render() {
+    formatters();
+    const input = readInput();
+    const r = analyse(input);
+
+    // --- headline -------------------------------------------------------
+    const one = r.floors.find((f) => f.nights === 1) || r.floors[0];
+    $('verdict').dataset.call = 'accept';
+    if (r.gap) {
+      $('verdictCall').textContent = `${money2.format(r.gap.marginalAtAlos)} is what a room night actually costs`;
+      $('verdictNet').textContent =
+        `Cost per occupied room says ${money2.format(r.gap.cpor)} — overstating the floor by ${money2.format(r.gap.overstatement)}`;
+      $('verdictWhy').textContent =
+        `The difference is fixed cost divided by occupied nights. It is an allocation, not something `
+        + `you avoid by selling fewer rooms, and pricing against it turns away business that would `
+        + `have contributed. At an average stay of ${n1.format(Number(input.averageLengthOfStay) || 0)} nights the real floor is `
+        + `${money2.format(r.gap.marginalAtAlos)}.`;
+    } else {
+      $('verdictCall').textContent = 'Enter occupancy and length of stay';
+      $('verdictNet').textContent = '';
+      $('verdictWhy').textContent = '';
+    }
+
+    // --- figures --------------------------------------------------------
+    const dl = $('figures');
+    dl.replaceChildren();
+    figure(dl, 'One night, season floor', money2.format(one.longRun),
+      'A one-nighter carries the whole changeover');
+    figure(dl, "One night, tonight's floor", money2.format(one.shortRun),
+      'Roster already paid — what the room burns');
+    figure(dl, 'Per stay', money2.format(r.perStay.long.total),
+      `Clean ${money2.format(r.perStay.long.labour)} · linen ${money2.format(r.perStay.long.linen)} · amenities ${money2.format(r.perStay.long.amenities)}`);
+    figure(dl, 'Per night', money2.format(r.perNight.long.total),
+      `Service ${money2.format(r.perNight.long.labour)} · energy ${money2.format(r.perNight.long.energy)} · water ${money2.format(r.perNight.long.water)}`);
+    figure(dl, 'Linen per changeover', money2.format(r.linen.total),
+      `Laundry ${money2.format(r.linen.laundry)} · wear ${money2.format(r.linen.wear)} · loss ${money2.format(r.linen.loss)}`);
+    figure(dl, 'Linen replacement', money.format(r.linenProgramme.replacementCost),
+      `${n0.format(r.linenProgramme.changeovers)} changeovers a period · ${money.format(r.linenProgramme.capitalInPar)} tied up in par`);
+
+    // --- floors ---------------------------------------------------------
+    const fb = $('floorRows');
+    fb.replaceChildren();
+    for (const f of r.floors) {
+      fillRow(fb, [
+        n0.format(f.nights),
+        money2.format(f.longRun),
+        money2.format(f.shortRun),
+        money2.format(f.longRun * f.nights),
+      ]);
+    }
+
+    // --- rate check -----------------------------------------------------
+    const nights = Number($('testNights').value) || 1;
+    const a = assessRate($('testRate').value, r.floors, nights, 'longRun');
+    const aShort = assessRate($('testRate').value, r.floors, nights, 'shortRun');
+    if (a) {
+      const rate = money2.format(a.rate);
+      if (a.coversFloor) {
+        $('rateVerdict').textContent =
+          `${rate} over ${n0.format(nights)} night${nights === 1 ? '' : 's'} clears the season floor of ${money2.format(a.floor)} by ${money2.format(a.margin)}. Worth publishing.`;
+      } else if (aShort && aShort.coversFloor) {
+        $('rateVerdict').textContent =
+          `${rate} is below the season floor of ${money2.format(a.floor)} by ${money2.format(-a.margin)}, but clears tonight's floor of ${money2.format(aShort.floor)}. Worth taking for a room that would otherwise go out empty; not worth publishing.`
+          + (a.viableFromNights ? ` It works as a standing rate from ${n0.format(a.viableFromNights)} nights.` : '');
+      } else {
+        $('rateVerdict').textContent =
+          `${rate} is below both floors — ${money2.format(a.floor)} for the season and ${money2.format(aShort ? aShort.floor : 0)} tonight. This loses money on every booking that takes it.`;
+      }
+    }
+
+    // --- CPOR curve -----------------------------------------------------
+    const cb = $('cporRows');
+    cb.replaceChildren();
+    const current = Math.round(Number(input.occupancyPct) || 0);
+    for (const c of r.cporCurve) {
+      const row = fillRow(cb, [
+        pctFmt.format(c.occupancyPct / 100),
+        money2.format(c.variablePerNight),
+        money2.format(c.fixedPerNight),
+        money2.format(c.cpor),
+      ]);
+      if (Math.abs(c.occupancyPct - current) < 5) row.classList.add('over');
+    }
+    if (r.cporCurve.length > 1) {
+      const first = r.cporCurve[0];
+      const last = r.cporCurve[r.cporCurve.length - 1];
+      $('cporNote').textContent =
+        `Between ${pctFmt.format(first.occupancyPct / 100)} and ${pctFmt.format(last.occupancyPct / 100)} occupancy the quoted figure moves from `
+        + `${money2.format(first.cpor)} to ${money2.format(last.cpor)}, a swing of ${money2.format(first.cpor - last.cpor)}. `
+        + `The variable column does not move at all. Nothing about the room changed — only what you divided by.`;
+    }
+
+    // --- warnings -------------------------------------------------------
+    const warn = $('warnings');
+    warn.replaceChildren();
+    for (const w of r.warnings) {
+      const p = document.createElement('p');
+      p.className = 'warn';
+      p.textContent = w;
+      warn.appendChild(p);
+    }
+  }
+
+  $('serviceFrequency').replaceChildren(
+    ...SERVICE_FREQUENCIES.map((f) => {
+      const o = document.createElement('option');
+      o.value = f.key;
+      o.textContent = f.label;
+      if (f.key === 'daily') o.selected = true;
+      return o;
+    }),
+  );
+
+  $('print').addEventListener('click', () => window.print());
+  document.addEventListener('input', render);
+  document.addEventListener('change', render);
+
+  render();
+
+  const items = document.querySelectorAll('.reveal');
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          e.target.style.transitionDelay = (i * 60) + 'ms';
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+    items.forEach((el) => io.observe(el));
+  } else {
+    items.forEach((el) => el.classList.add('in'));
+  }
+</script>
+</body>
+</html>
