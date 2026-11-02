@@ -122,12 +122,19 @@ export function evaluateDay(day, globals, blended) {
   const hourlyCost = num(globals.baseHourlyRate) * multiplier * (1 + pct(globals.oncostPct));
   const cost = paidHours * hourlyCost;
 
-  return {
+  // Once the shift is rostered it is paid for whatever happens, so the
+  // spare capacity inside it is what the next clean actually costs --
+  // which is nothing, until it runs out.
+  const spareProductiveMinutes = slackHours * productivity * 60;
+  const absorbsAnotherClean = spareProductiveMinutes >= blended.departureMinutes;
+
+  const evaluated = {
     date: day.date || '',
     occupied,
     arrivals,
     departures,
     stayovers,
+    lateCheckouts: atLeastZero(num(day.lateCheckouts)),
     servicedStayovers,
     departureMinutes,
     stayoverMinutes,
@@ -138,14 +145,137 @@ export function evaluateDay(day, globals, blended) {
     staffOnShift,
     paidHours,
     slackHours,
+    spareProductiveMinutes,
+    absorbsAnotherClean,
     penaltyMultiplier: multiplier,
     hourlyCost,
     cost,
+    // Committed the moment the roster is published, regardless of how the
+    // day actually goes.
+    committedCost: cost,
+    // Of the work in the day, how much is there whether or not rooms turn.
+    fixedShare: totalMinutes > 0 ? fixedMinutes / totalMinutes : 0,
+    variableShare: totalMinutes > 0 ? (totalMinutes - fixedMinutes) / totalMinutes : 0,
     costPerOccupiedRoom: occupied > 0 ? cost / occupied : 0,
     // Share of the day's clean work created by rooms changing hands.
     departureShare: totalMinutes > 0 ? departureMinutes / totalMinutes : 0,
     // Occupancy on the previous night, implied by tonight's figures.
     impliedPriorOccupied: stayovers + departures,
+  };
+
+  const capacity = lateCheckoutCapacity(evaluated, globals, blended);
+  const economics = lateCheckoutEconomics(evaluated, globals, blended, capacity);
+
+  return { ...evaluated, lateCheckout: { ...capacity, ...economics } };
+}
+
+/** "14:30" -> 14.5. Returns null for anything unusable. */
+export function parseTime(value) {
+  if (typeof value !== 'string') return null;
+  const m = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (!(h >= 0 && h <= 24) || !(min >= 0 && min < 60)) return null;
+  return h + min / 60;
+}
+
+/**
+ * How many late checkouts a day can absorb before it costs anything.
+ *
+ * A late checkout does not create extra work -- it is the same clean,
+ * pushed into a narrower window. Total minutes are unchanged; what
+ * changes is how much of the shift is still available to do them in.
+ *
+ * So the constraint is scheduling, not volume. Normal work can use the
+ * whole shift; a late room can only be cleaned after the guest leaves.
+ * Where the normal work already overflows into the afternoon, there is
+ * that much less room for late departures.
+ */
+export function lateCheckoutCapacity(day, globals, blended) {
+  const shiftStart = parseTime(globals.shiftStart) ?? 8;
+  const lateAt = parseTime(globals.lateCheckoutTime) ?? 14;
+  const shiftHours = Math.max(0.5, num(globals.shiftHours) || 8);
+  const productivity = Math.min(1, Math.max(0.05, pct(globals.productivityPct) || 1));
+  const shiftEnd = shiftStart + shiftHours;
+
+  const lateWindowHours = atLeastZero(shiftEnd - Math.max(lateAt, shiftStart));
+  const staff = day.staffOnShift;
+
+  const totalCapacity = staff * shiftHours * 60 * productivity;
+  const lateWindowCapacity = staff * lateWindowHours * 60 * productivity;
+  const capacityBeforeLate = atLeastZero(totalCapacity - lateWindowCapacity);
+
+  const granted = atLeastZero(num(day.lateCheckouts));
+  const lateWork = granted * blended.departureMinutes;
+  const normalWork = atLeastZero(day.totalMinutes - lateWork);
+
+  // Whatever normal work could not be finished before the late window
+  // eats into the capacity the late rooms need.
+  //
+  // Note the consequence: on a day heavy enough that the normal work
+  // already runs past the late checkout time, everything left is at the
+  // back of the shift anyway, so moving the checkout time makes no
+  // difference and the day's total spare capacity is what binds. The
+  // window only constrains on days that would otherwise finish early.
+  const normalOverflow = atLeastZero(normalWork - capacityBeforeLate);
+  const availableForLate = atLeastZero(lateWindowCapacity - normalOverflow);
+
+  const absorbable = blended.departureMinutes > 0
+    ? Math.floor(availableForLate / blended.departureMinutes)
+    : 0;
+
+  return {
+    lateWindowHours,
+    lateWindowCapacity,
+    availableForLate,
+    absorbable,
+    granted,
+    beyondCapacity: atLeastZero(granted - absorbable),
+    shiftEnd,
+    lateAt,
+  };
+}
+
+/**
+ * What a late checkout is actually worth.
+ *
+ * Inside capacity the marginal labour cost is zero -- the shift is
+ * already rostered and paid for, so the clean costs nothing extra.
+ * Past it, the work runs into overtime and each one has a real price.
+ * Against that sits whatever the guest spends by still being on the
+ * property at lunchtime, plus anything charged for the late checkout
+ * itself.
+ */
+export function lateCheckoutEconomics(day, globals, blended, capacity) {
+  const productivity = Math.min(1, Math.max(0.05, pct(globals.productivityPct) || 1));
+  const overtimeMultiplier = num(globals.overtimeMultiplier) || 1.5;
+
+  const marginalHours = blended.departureMinutes / 60 / productivity;
+  const marginalCostPerLate = marginalHours * day.hourlyCost * overtimeMultiplier;
+
+  const valuePerLate = num(globals.lateCheckoutPrice) + num(globals.ancillaryPerLateCheckout);
+
+  const overtimeHours = capacity.beyondCapacity * marginalHours;
+  const overtimeCost = overtimeHours * day.hourlyCost * overtimeMultiplier;
+
+  const grossValue = capacity.granted * valuePerLate;
+
+  // Past capacity every additional one still pays for itself while the
+  // spend it brings in beats the overtime it causes.
+  const worthwhileBeyondCapacity = valuePerLate > marginalCostPerLate;
+
+  return {
+    marginalCostPerLate,
+    valuePerLate,
+    overtimeHours,
+    overtimeCost,
+    grossValue,
+    netValue: grossValue - overtimeCost,
+    worthwhileBeyondCapacity,
+    // The number worth granting: unlimited past capacity when each one
+    // still pays, otherwise stop at the free allowance.
+    grantUpTo: worthwhileBeyondCapacity ? null : capacity.absorbable,
   };
 }
 
@@ -230,6 +360,11 @@ export function analyse(input = {}) {
     oncostPct: input.oncostPct,
     saturdayMultiplier: input.saturdayMultiplier,
     sundayMultiplier: input.sundayMultiplier,
+    shiftStart: input.shiftStart,
+    lateCheckoutTime: input.lateCheckoutTime,
+    overtimeMultiplier: input.overtimeMultiplier,
+    lateCheckoutPrice: input.lateCheckoutPrice,
+    ancillaryPerLateCheckout: input.ancillaryPerLateCheckout,
   };
 
   const blended = blendedMinutes(input.unitTypes);
@@ -281,6 +416,18 @@ export function analyse(input = {}) {
       staffSpread: peakStaff - Math.min(...staffCounts),
       impliedAlos: alos,
       blendedHourlyCost,
+      // Fixed work happens whether or not a single room turns over.
+      fixedMinutes: sum((d) => d.fixedMinutes),
+      fixedShare: totalMinutes > 0 ? sum((d) => d.fixedMinutes) / totalMinutes : 0,
+      // Late checkout, across the period.
+      lateAbsorbable: sum((d) => d.lateCheckout.absorbable),
+      lateGranted: sum((d) => d.lateCheckout.granted),
+      lateBeyondCapacity: sum((d) => d.lateCheckout.beyondCapacity),
+      lateOvertimeCost: sum((d) => d.lateCheckout.overtimeCost),
+      lateGrossValue: sum((d) => d.lateCheckout.grossValue),
+      lateNetValue: sum((d) => d.lateCheckout.netValue),
+      // Free capacity nobody is selling: the give-away days.
+      lateUnusedCapacity: sum((d) => atLeastZero(d.lateCheckout.absorbable - d.lateCheckout.granted)),
     },
     matchedPair: pair,
     inversion: costOccupancyInversion(days),
@@ -388,4 +535,19 @@ export function verdict(totals, threshold) {
   if (totals.departureShare > 0.6) return 'departure-driven';
   if (totals.departureShare > 0.35) return 'mixed';
   return 'stayover-driven';
+}
+
+/**
+ * What to do about late checkouts, across the period.
+ *
+ * The days when most guests ask are the days most guests are leaving,
+ * which are the days it costs most to say yes -- so a blanket policy is
+ * wrong in both directions at once. This is the yield call.
+ */
+export function lateCheckoutVerdict(totals) {
+  if (!totals) return 'incomplete';
+  if (totals.lateGranted === 0 && totals.lateAbsorbable > 0) return 'giving-nothing';
+  if (totals.lateBeyondCapacity > 0 && totals.lateNetValue < 0) return 'overcommitted';
+  if (totals.lateUnusedCapacity > 0) return 'underused';
+  return 'balanced';
 }
