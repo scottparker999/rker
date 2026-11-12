@@ -10,3 +10,4 @@ Thumbs.db
 node_modules/
 .vercel/
 .wrangler/
+pwa/tennis-fitness/version.json

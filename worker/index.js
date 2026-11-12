@@ -109,7 +109,8 @@ export async function handleApi(request, env) {
     return json({ error: "Expected application/json" }, 415);
   }
 
-  // POST /api/log/ingest  Health Auto Export JSON -> tennis sessions in "play"
+  // POST /api/log/ingest  Health Auto Export JSON -> tennis sessions in "play",
+  // and bodyweight readings (if the export includes Weight) in "body"
   if (parts.length === 1 && parts[0] === "ingest") {
     if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
     if (Number(request.headers.get("content-length") || 0) > MAX_INGEST) return json({ error: "Too large" }, 413);
@@ -126,9 +127,11 @@ export async function handleApi(request, env) {
       if (doc && !checkOp({ op: "put", col: "play", id: doc.id, body: doc })) ops.push({ op: "put", col: "play", id: doc.id, body: doc });
     }
     const res = ops.length ? await store.apply(ops) : { applied: 0, created: 0 };
+    const weights = bodyWeights(payload);
+    const saved = weights.length ? await store.mergeWeights(weights, now) : 0;
     const dates = ops.map((o) => o.body.date).sort();
     return json({ ok: true, received: workouts.length, tennis: ops.length, applied: res.applied, created: res.created,
-      first: dates[0] || null, last: dates[dates.length - 1] || null }, 200);
+      first: dates[0] || null, last: dates[dates.length - 1] || null, weights: saved }, 200);
   }
 
   // GET /api/log -> everything
@@ -209,6 +212,25 @@ function parseHaeDate(s) {
   const iso = `${m[1]}T${m[2]}:${m[3] || "00"}${m[4]}:${m[5] || "00"}`;
   const t = Date.parse(iso);
   return Number.isFinite(t) ? { t, date: m[1], hhmm: m[2] } : null;
+}
+
+// Bodyweight readings from the export's metrics: the last reading of each day, in kg.
+function bodyWeights(payload) {
+  const metrics = (payload && payload.data && payload.data.metrics) || (payload && payload.metrics) || [];
+  if (!Array.isArray(metrics)) return [];
+  const byDay = new Map();
+  for (const m of metrics) {
+    if (!m || !/^(weight_body_mass|body_mass|weight)$/i.test(String(m.name || "")) || !Array.isArray(m.data)) continue;
+    const lb = /lb/i.test(String(m.units || ""));
+    for (const r of m.data) {
+      const d = parseHaeDate(r && r.date);
+      const kg = num(r && r.qty) == null ? null : lb ? r.qty * 0.45359237 : r.qty;
+      if (!d || kg == null || kg < 25 || kg > 300) continue;
+      const cur = byDay.get(d.date);
+      if (!cur || d.t >= cur.t) byDay.set(d.date, { t: d.t, date: d.date, kg: round(kg, 1) });
+    }
+  }
+  return [...byDay.values()].map(({ date, kg }) => ({ date, kg }));
 }
 
 function summariseWorkout(w, now) {
@@ -304,6 +326,24 @@ export class LogStore extends DurableObject {
       if (out[row.col]) out[row.col][row.id] = JSON.parse(row.body);
     }
     return out;
+  }
+
+  // Bodyweight from Apple Health fills in a day's weight without touching the other
+  // measurements, and never replaces a weight typed into the app by hand.
+  mergeWeights(list, now) {
+    let saved = 0;
+    this.ctx.storage.transactionSync(() => {
+      for (const { date, kg } of list) {
+        const row = this.sql.exec(`SELECT body FROM docs WHERE col = 'body' AND id = ?`, date).toArray()[0];
+        const cur = row ? JSON.parse(row.body) : { date, weight: null, arm: null, chest: null, waist: null, photo: false };
+        if (cur.weight != null && cur.weightSource !== "Apple Health") continue;
+        if (cur.weight === kg) continue;
+        const body = { ...cur, weight: kg, weightSource: "Apple Health", updatedAt: now };
+        this.sql.exec(`INSERT OR REPLACE INTO docs (col, id, body, updated_at) VALUES ('body', ?, ?, ?)`, date, JSON.stringify(body), now);
+        saved++;
+      }
+    });
+    return saved;
   }
 
   // Applies ops in order, in one transaction. A put carrying an older updatedAt

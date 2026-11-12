@@ -1,10 +1,19 @@
 // Tennis Fitness Tracker service worker: keeps the app shell available offline.
-// Bump VERSION whenever app.css, app.js or the fonts change.
-const VERSION = "tft-v14";
+// VERSION, the ?v= stamps and the SHELL list below are rewritten on every deploy by
+// scripts/build.mjs (from a hash of the app's files), so there is nothing to bump by hand.
+const VERSION = "tft-dev";
+/*SHELL*/
 const SHELL = [
   "/log/",
-  "/log/app.css?v=14",
-  "/log/app.js?v=14",
+  "/log/app.css?v=dev",
+  "/log/app.js?v=dev",
+  "/log/lib/charts.js",
+  "/log/lib/dom.js",
+  "/log/lib/format.js",
+  "/log/lib/plan.js",
+  "/log/lib/plates.js",
+  "/log/lib/rotation.js",
+  "/log/lib/strength.js",
   "/log/fonts/barlow-condensed-latin-600-normal.woff2",
   "/log/fonts/barlow-condensed-latin-700-normal.woff2",
   "/log/fonts/ibm-plex-sans-latin-400-normal.woff2",
@@ -12,6 +21,7 @@ const SHELL = [
   "/log/fonts/ibm-plex-sans-latin-600-normal.woff2",
   "/log/fonts/ibm-plex-mono-latin-500-normal.woff2",
 ];
+/*/SHELL*/
 const NAV_TIMEOUT_MS = 2500;
 
 self.addEventListener("install", (event) => {
@@ -91,9 +101,11 @@ self.addEventListener("push", (event) => {
     }
   } catch {}
   const url = typeof m.url === "string" && m.url.startsWith("/log/") ? m.url : "/log/";
-  event.waitUntil(self.registration.showNotification(m.title, {
-    body: m.body, tag: m.tag, icon: "/pwa/tennis-fitness/icon-192.png?v=2", data: { url },
-  }));
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(m.title, { body: m.body, tag: m.tag, icon: "/pwa/tennis-fitness/icon-192.png?v=2", data: { url } }),
+    // mark the Home Screen icon until today's session is logged (the app clears it)
+    self.navigator.setAppBadge ? self.navigator.setAppBadge(1).catch(() => {}) : null,
+  ]));
 });
 
 self.addEventListener("notificationclick", (event) => {

@@ -32,3 +32,14 @@ test("a test on a rest day previews the next training day", () => {
   const m = buildReminder({}, plan, tue8am + 864e5, { force: true });
   assert.equal(m.title, "Pull + arms tomorrow");
 });
+
+test("names the workout that is due, so a missed day is caught up", () => {
+  // Saturday's session was the last one done; Tuesday was missed, so Thursday's reminder is for push
+  const three = { days: [...plan.days, { dow: 6, key: "upper", name: "Arms + legs", mins: 55, ex: [] }] };
+  const data = { sessions: { "2026-10-31_upper": { date: "2026-10-31", day: "upper", entries: { x: [set(5, 8)] } } } };
+  assert.equal(buildReminder(data, three, tue8am + 2 * 864e5).title, "Push + arms today");
+  // and after Tuesday's push, Thursday is pull as usual
+  data.sessions["2026-11-03_push"] = { date: "2026-11-03", day: "push", entries: { "floor-press": [set(12, 6)] } };
+  assert.equal(buildReminder(data, three, tue8am + 2 * 864e5).title, "Pull + arms today");
+});
+

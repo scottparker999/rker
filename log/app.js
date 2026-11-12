@@ -1,225 +1,13 @@
-"use strict";
-/* ---------- helpers ---------- */
-const $ = s=>document.querySelector(s);
-// el("div",{class:"x",onclick:fn},children…): build an element; null/false attributes and children are skipped
-const el = (tag,attrs={},...kids)=>{const n=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==="class")n.className=v;else if(k.startsWith("on"))n.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined&&v!==false)n.setAttribute(k,v===true?"":v)}for(const c of kids.flat()){if(c==null||c===false)continue;n.append(c.nodeType?c:document.createTextNode(c))}return n};
-const svgEl=(t,a={})=>{const e=document.createElementNS("http://www.w3.org/2000/svg",t);for(const k in a)e.setAttribute(k,a[k]);return e};
-// dates are "YYYY-MM-DD" in local time; noon avoids daylight-saving edge cases
-const iso = d=>{const z=new Date(d);z.setMinutes(z.getMinutes()-z.getTimezoneOffset());return z.toISOString().slice(0,10)};
-const dayT=d=>Date.parse(d+"T12:00:00");
-const weekStart=d=>{const x=new Date(d+"T12:00:00");x.setDate(x.getDate()-(x.getDay()+6)%7);return iso(x)};
-const fmtDate = s=>new Date(s+"T12:00:00").toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short"});
-const fmtShort = s=>new Date(s+"T12:00:00").toLocaleDateString("en-AU",{day:"numeric",month:"short"});
-const shortDM=d=>{const x=new Date(d+"T12:00:00");return x.getDate()+"/"+(x.getMonth()+1)};
-const num = v=>{if(v===""||v==null)return null;const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:null};
-const fmtKg = n=>n==null?"–":(Math.round(n*10)/10).toString();
-const fmtInt=n=>n==null?"–":Math.round(n).toLocaleString("en-AU");
-const fmtDur=min=>{if(min==null)return "–";const h=Math.floor(min/60),m=Math.round(min%60);return h?h+"h "+String(m).padStart(2,"0")+"m":m+"m"};
-const fmtClock=hhmm=>{if(!hhmm)return "";const[h,m]=hhmm.split(":").map(Number);return (h%12||12)+":"+String(m).padStart(2,"0")+(h<12?"am":"pm")};
-const signed=(v,d=1,u="")=>(v>0?"+":v<0?"−":"±")+Math.abs(v).toFixed(d).replace(/\.0+$/,"")+u;
+import {$,el,svgEl} from "./lib/dom.js";
+import {iso,dayT,weekStart,fmtDate,fmtShort,shortDM,num,fmtKg,fmtInt,fmtDur,fmtClock,signed} from "./lib/format.js";
+import {PLAN,HOW,ORDER,EX,allExercises} from "./lib/plan.js";
+import {PLATE_TYPES,handleKg,setHandleKg,perSideMax,emptyLoad,loadKg,bestLoad,reachable,nextLoadKg,sideText,plateMax,snapKg,legacyKg} from "./lib/plates.js";
+import {doneSets,readyToProgress,sessionScore,bestSet,strengthSeries as strengthSeriesOf,volume} from "./lib/strength.js";
+import {dueDay,trainedOn} from "./lib/rotation.js";
+import {chartW,lineChart,sparkSVG} from "./lib/charts.js";
+
 const kpi=(val,lbl,sub)=>el("div",{class:"kpi"},el("b",{class:"num"},val),el("span",{},lbl),sub?el("small",{},sub):null);
 
-/* Each day is ordered into weight "stations": exercises in a station use the same
-   dumbbell setup, so you only reload between stations. kg = default per-dumbbell
-   weight (assuming a 2 kg handle) until you've logged the station's first exercise. */
-const PLAN = {
-  push:{name:"Push + arms",sub:"Tuesday",dow:2,mins:45,
-   stations:{
-    A:{kit:"one",kg:2,label:"One bare handle",note:"Warm-up for the shoulder."},
-    B:{kit:"pair",kg:12,label:"Both dumbbells heavy",note:"Floor press, then use one of them for the triceps extension."},
-    C:{kit:"pair",kg:7,label:"Both dumbbells medium",note:"Press and curls share this weight."},
-    D:{kit:"pair",kg:4.5,label:"Both dumbbells light"}},
-   ex:[
-    {id:"ext-rot",st:"A",n:"Side-lying external rotation",sets:2,lo:15,hi:15,start:"Bare handle",unit:"per arm",rest:45,load:"kg"},
-    {id:"floor-press",st:"B",n:"Dumbbell floor press",sets:4,lo:6,hi:8,start:"10–14 kg",unit:"per hand",rest:150,load:"kg"},
-    {id:"oh-tri",st:"B",n:"Overhead tricep extension",sets:3,lo:8,hi:12,start:"One floor-press dumbbell",unit:"held in both hands",rest:75,load:"kg"},
-    {id:"ohp",st:"C",pair:"zottman",n:"Standing overhead press",sets:3,lo:8,hi:12,start:"6–10 kg",unit:"per hand",rest:90,load:"kg"},
-    {id:"zottman",st:"C",n:"Zottman curls",sets:3,lo:8,hi:12,start:"Same as the press",unit:"per hand",rest:75,load:"kg"},
-    {id:"lateral",st:"D",n:"Lateral raises",sets:3,lo:12,hi:15,start:"3–5 kg",unit:"per hand",rest:60,load:"kg"}
-  ]},
-  pull:{name:"Pull + arms",sub:"Thursday",dow:4,mins:50,
-   stations:{
-    A:{kit:"pair",kg:4.5,label:"Both dumbbells light",note:"Warm-up for the upper back."},
-    B:{kit:"pair",kg:12,label:"Both dumbbells heavy",note:"Rows, close-grip press and pullovers all use this weight."},
-    C:{kit:"pair",kg:7,label:"Both dumbbells medium"},
-    D:{kit:"one",kg:4.5,label:"Take one dumbbell down to light",note:"Keep the other at curl weight for palm-up wrist curls."}},
-   ex:[
-    {id:"rear-fly",st:"A",n:"Rear-delt flyes",sets:3,lo:12,hi:15,start:"3–5 kg",unit:"per hand",rest:60,load:"kg"},
-    {id:"bo-row",st:"B",pair:"cg-press",n:"Bent-over row",sets:4,lo:6,hi:10,start:"10–14 kg",unit:"per hand",rest:120,load:"kg"},
-    {id:"cg-press",st:"B",n:"Close-grip floor press",sets:3,lo:8,hi:12,start:"Same as the row",unit:"per hand",rest:90,load:"kg"},
-    {id:"pullup",st:"B",n:"Pull-ups or pullovers",sets:3,lo:null,hi:null,start:"Bodyweight / one row dumbbell",unit:"as many as possible",rest:120,load:"bw"},
-    {id:"curl",st:"C",n:"Bicep curls",sets:3,lo:8,hi:12,start:"7–10 kg",unit:"per hand",rest:75,load:"kg"},
-    {id:"wrist",st:"D",n:"Wrist curls + reverse",sets:2,lo:15,hi:15,start:"Curl dumbbell / light dumbbell",unit:"palm up / palm down",rest:45,load:"kg"}
-  ]},
-  upper:{name:"Arms + legs",sub:"Saturday",dow:6,mins:55,
-   stations:{
-    A:{kit:"none",label:"No weights",note:"Load the dumbbells for hammer curls while you rest."},
-    B:{kit:"pair",kg:7,label:"Both dumbbells medium",note:"Hammer curls, then one of them for concentration curls."},
-    C:{kit:"pair",kg:4.5,label:"Both dumbbells light",note:"Skull crushers, then one of them for woodchops."},
-    D:{kit:"pair",kg:14.5,label:"Both dumbbells heavy",note:"Deadlifts, split squats and calf raises."}},
-   ex:[
-    {id:"diamond",st:"A",n:"Close-grip push-ups",sets:3,lo:null,hi:null,start:"Bodyweight",unit:"as many as possible",rest:90,load:"bw"},
-    {id:"hammer",st:"B",n:"Hammer curls",sets:3,lo:8,hi:12,start:"8–10 kg",unit:"per hand",rest:60,load:"kg"},
-    {id:"conc-curl",st:"B",n:"Concentration curls",sets:2,lo:8,hi:12,start:"One hammer-curl dumbbell",unit:"per arm",rest:45,load:"kg"},
-    {id:"skull",st:"C",pair:"woodchop",n:"Floor skull crushers",sets:3,lo:10,hi:15,start:"5–8 kg",unit:"per hand",rest:60,load:"kg"},
-    {id:"woodchop",st:"C",n:"Dumbbell woodchop",sets:2,lo:10,hi:12,start:"One skull-crusher dumbbell",unit:"per side",rest:45,load:"kg"},
-    {id:"rdl",st:"D",n:"Romanian deadlift",sets:3,lo:8,hi:10,start:"12–16 kg",unit:"per hand",rest:120,load:"kg"},
-    {id:"split",st:"D",n:"Rear-foot-elevated split squat",sets:2,lo:10,hi:10,start:"Bodyweight, then the deadlift dumbbells",unit:"per leg",rest:75,load:"kg"},
-    {id:"calf",st:"D",n:"Single-leg calf raises",sets:2,lo:15,hi:15,start:"Bodyweight, then one deadlift dumbbell",unit:"per leg",rest:45,load:"kg"}
-  ]}
-};
-/* ---------- exercise instructions (shown under "How to do it") ----------
-   steps: in order; an item {h:"…"} starts a new group (e.g. an alternative version)
-   feel: where you should feel it working; avoid: the common form mistakes */
-const HOW={
-  "floor-press":{steps:[
-    "Sit on the floor with a dumbbell standing on each thigh. Lie back with knees bent and feet flat, bringing the dumbbells to your chest as you go.",
-    "Press both dumbbells straight up over your chest, palms facing your feet. This is the start position.",
-    "Lower slowly (about 2 seconds) with your elbows at roughly 45° from your body: an arrow shape, not a T.",
-    "Let the backs of your upper arms rest on the floor for one second. Keep your shoulder blades squeezed together.",
-    "Press back up until your arms are straight, finishing with the dumbbells over your chest, not your face.",
-    "To finish, lower the dumbbells to your chest and roll them onto your thighs as you sit up."],
-    feel:"Chest, front of the shoulders and triceps.",
-    avoid:["Elbows flared straight out to the sides, which strains the shoulders.","Bouncing your elbows off the floor.","Lifting your hips or arching your lower back off the floor."]},
-  "ohp":{steps:[
-    "Stand with feet hip-width apart, dumbbells at shoulder height, palms facing forward, elbows slightly in front of your body.",
-    "Squeeze your glutes and brace your abs as if someone's about to poke your stomach. Keep your ribs pulled down.",
-    "Press straight up until your arms are straight and your biceps are beside your ears.",
-    "Lower slowly (2 seconds) back to shoulder height."],
-    feel:"Shoulders and triceps.",
-    avoid:["Leaning back or arching your lower back to get the weight up. Go lighter if you need to.","Using your legs to bounce the weight up.","Stopping halfway: go all the way up and all the way down."]},
-  "lateral":{steps:[
-    "Stand tall with soft knees, dumbbells by your sides, palms facing in. Lean forward very slightly.",
-    "Bend your elbows a little and keep them fixed at that angle for the whole set.",
-    "Raise your arms out to the sides until your hands reach shoulder height and no higher. Think of pushing your hands out to the walls, not up to the ceiling.",
-    "Pause for a moment, then lower over 2–3 seconds."],
-    feel:"The sides of your shoulders.",
-    avoid:["Swinging your body to get the weights up. If you need to swing, they're too heavy.","Shrugging your shoulders up towards your ears.","Lifting above shoulder height."]},
-  "oh-tri":{steps:[
-    "Stand or sit tall. Hold one dumbbell vertically with both hands, palms cupping the underside of the top plate.",
-    "Press it straight overhead with your upper arms close to your ears.",
-    "Keep your upper arms still and elbows pointing forward. Bend only at the elbows to lower the dumbbell behind your head until you feel a deep stretch in the backs of your arms.",
-    "Straighten your arms to lift it back up. Only your forearms move."],
-    feel:"The backs of your upper arms (triceps), with a strong stretch at the bottom.",
-    avoid:["Elbows flaring out wide.","Arching your lower back. Brace your abs, or sit on a chair with a back.","Dropping the weight quickly behind your head."]},
-  "zottman":{steps:[
-    "Stand tall, dumbbells by your sides, palms facing forward. Pin your elbows to your sides.",
-    "Curl both dumbbells up to shoulder height, moving only at the elbows.",
-    "At the top, turn your wrists so your palms face down.",
-    "Lower slowly over 3 seconds with palms down. At the bottom, turn your palms forward again for the next rep."],
-    feel:"Biceps on the way up, the top of your forearms on the way down.",
-    avoid:["Elbows drifting forward as you curl.","Swinging your body.","Going too heavy. The palms-down lowering is the hard part, so pick a weight you can lower slowly."]},
-  "ext-rot":{steps:[
-    "Lie on your side with knees bent, head resting on your lower arm or a pillow.",
-    "Hold a light dumbbell in your top hand. Bend that elbow to 90° and pin it to your side. A rolled-up towel between your elbow and ribs helps.",
-    "Start with the forearm resting across your stomach. Rotate it up towards the ceiling as far as is comfortable, keeping the elbow glued to your side.",
-    "Pause, then lower over 3 seconds. Do all reps, then roll over and do the other arm."],
-    feel:"The back of your shoulder. It's a small muscle, so a mild burn is normal.",
-    avoid:["Your elbow lifting off your ribs.","Rolling your body backwards to help.","Going heavy: 1–3 kg is plenty. This is about control."]},
-  "bo-row":{steps:[
-    "Stand with feet hip-width apart, a dumbbell in each hand, knees slightly bent.",
-    "Push your hips back until your torso is at about 45°. Keep your back flat and look at the floor about a metre ahead. Let the dumbbells hang below your shoulders, palms facing each other.",
-    "Brace your abs, then pull the dumbbells towards your lower ribs with your elbows going back at about 45° from your body. Squeeze your shoulder blades together at the top.",
-    "Lower until your arms are straight. Keep your torso at the same angle the whole time."],
-    feel:"Upper and middle back, the backs of your shoulders and your lats.",
-    avoid:["Rounding your lower back. This is the big one: go lighter if it rounds.","Standing up more as you pull.","Jerking the weight or shrugging."]},
-  "pullup":{steps:[
-    {h:"With a bar: pull-ups"},
-    "Grip the bar slightly wider than your shoulders, palms facing away (or towards you for chin-ups, which are a little easier).",
-    "Hang with straight arms. Before bending your arms, pull your shoulders down away from your ears.",
-    "Pull until your chin is over the bar, driving your elbows down towards your hips.",
-    "Lower all the way to straight arms over 2–3 seconds.",
-    {h:"No bar: floor pullovers"},
-    "Lie on the floor with knees bent. Hold one dumbbell with both hands cupping the top plate, arms straight up above your chest.",
-    "With a slight bend in your elbows, lower the dumbbell in an arc behind your head until you feel a stretch along your sides.",
-    "Pull it back over your chest along the same arc. Keep your lower back on the floor."],
-    feel:"Lats (the wide muscles down your sides and back) and biceps.",
-    avoid:["Swinging or kicking to get up.","Half reps: straight arms at the bottom every time.","On pullovers, arching your lower back off the floor."]},
-  "curl":{steps:[
-    "Stand tall, dumbbells by your sides, palms facing forward, shoulders back. Pin your elbows to your sides.",
-    "Curl the dumbbells up, bending only at the elbows, until your forearms are vertical.",
-    "Squeeze your biceps hard for one second at the top.",
-    "Lower over 3 seconds all the way to straight arms. The slow lowering does as much as the lift."],
-    feel:"Biceps.",
-    avoid:["Leaning back or swinging your hips.","Elbows drifting forward at the top, which shifts the work to your shoulders.","Stopping short of straight arms at the bottom."]},
-  "cg-press":{steps:[
-    "Lie on the floor with knees bent. Press both dumbbells up above your chest and touch them together, palms facing each other.",
-    "Keep the dumbbells squeezed together for the whole set.",
-    "Lower slowly with your elbows tucked tight to your sides until your upper arms touch the floor. The dumbbells end up above your lower chest.",
-    "Press straight back up, concentrating on straightening your elbows."],
-    feel:"Triceps first, then the inner chest.",
-    avoid:["Elbows flaring out to the sides.","The dumbbells drifting towards your face.","Bouncing your elbows off the floor."]},
-  "rear-fly":{steps:[
-    "Stand with feet hip-width apart and soft knees. Hinge forward at the hips until your chest is nearly parallel to the floor, back flat. (Or sit on the edge of a chair and lean your chest towards your thighs.)",
-    "Let the dumbbells hang under your chest, palms facing each other, elbows slightly bent.",
-    "Raise your arms out to the sides in a wide arc until they're level with your body, like a T.",
-    "Pause, then lower over 2–3 seconds."],
-    feel:"The backs of your shoulders and between your shoulder blades.",
-    avoid:["Too much weight, which turns it into a row (elbows bending more and more).","Swinging your torso up and down.","Shrugging your shoulders."]},
-  "wrist":{steps:[
-    "Sit on a chair and rest your forearm along your thigh, wrist just past your knee, holding a dumbbell palm up.",
-    "Let the dumbbell roll down towards your fingertips, then curl it back into your palm and lift your wrist as high as it goes. Your forearm stays on your thigh.",
-    "Lower slowly. Do 15 reps, then switch arms.",
-    "Reverse curls: same position, palm facing down, lighter dumbbell. Lift the back of your hand towards the ceiling, then lower slowly."],
-    feel:"Forearms, the front on palm-up and the top on palm-down.",
-    avoid:["Lifting your forearm off your thigh.","Bouncing the weight.","Going heavy on the palm-down version, which can strain the wrist."]},
-  "diamond":{steps:[
-    "Place your hands on the floor under your chest, a little narrower than shoulder-width.",
-    "Get into a straight line from head to heels: squeeze your glutes and brace your abs.",
-    "Lower your chest towards your hands, with your elbows brushing your ribs and pointing back towards your feet, until your chest is a fist's height from the floor.",
-    "Push back up to straight arms. When you can't do full reps, drop to your knees and keep going."],
-    feel:"Triceps and chest.",
-    avoid:["Hips sagging or sticking up.","Elbows flaring out to the sides.","Letting your head drop towards the floor."]},
-  "hammer":{steps:[
-    "Stand tall, dumbbells by your sides, palms facing your thighs (thumbs pointing forward). Pin your elbows.",
-    "Curl the dumbbells up with palms still facing each other, like holding two hammers, until your forearms are vertical.",
-    "Squeeze for a moment at the top.",
-    "Lower over 3 seconds to straight arms."],
-    feel:"The outer part of your upper arm and your forearm.",
-    avoid:["Swinging your body.","Elbows drifting forward.","Twisting your wrists: palms stay facing in throughout."]},
-  "skull":{steps:[
-    "Lie on the floor with knees bent, dumbbells pressed up above your chest, palms facing each other.",
-    "Tilt your arms back slightly so the dumbbells are above your forehead. This keeps the tension on your triceps.",
-    "Keep your upper arms still and bend only at the elbows to lower the dumbbells slowly beside your head, until they nearly touch the floor.",
-    "Straighten your elbows to return to the slightly tilted start position."],
-    feel:"The backs of your upper arms (triceps).",
-    avoid:["Elbows flaring out.","Moving your upper arms, which turns it into a press.","Lowering quickly near your face."]},
-  "conc-curl":{steps:[
-    "Sit on a chair with your feet wide. Hold a dumbbell and lean forward, bracing the back of your upper arm against the inside of the same-side thigh. Let the arm hang straight down.",
-    "Curl the dumbbell up towards your shoulder, keeping your upper arm pressed against your thigh.",
-    "Squeeze hard for one second at the top.",
-    "Lower slowly to a fully straight arm. Do all reps on one arm, then switch."],
-    feel:"Biceps, with a strong squeeze at the top.",
-    avoid:["Lifting your elbow off your thigh.","Using your body or leg to help.","Stopping short of a straight arm."]},
-  "woodchop":{steps:[
-    "Stand with feet wider than your shoulders, holding one dumbbell by its ends with both hands.",
-    "Start with the dumbbell up beside your right shoulder, torso turned slightly to the right.",
-    "Rotate your torso and pivot your back foot to bring the dumbbell diagonally down across your body to the outside of your left knee, bending your knees as you go. Arms stay fairly straight: the power comes from your hips and torso.",
-    "Return under control to the start. Do all reps on one side, then switch."],
-    feel:"The sides of your waist (obliques) and your core. This is the rotation behind your groundstrokes.",
-    avoid:["Rounding your lower back at the bottom.","Doing it with your arms only.","Going faster than you can control."]},
-  "rdl":{steps:[
-    "Stand with feet hip-width apart, dumbbells in front of your thighs, palms facing you. Unlock your knees slightly and keep that small bend fixed.",
-    "Push your hips straight back, sliding the dumbbells down the front of your legs and keeping them close.",
-    "Keep your back flat and chest up. Stop when you feel a strong stretch in your hamstrings, usually just below the knees to mid-shin. Don't chase the floor.",
-    "Drive your hips forward to stand tall, squeezing your glutes at the top. Don't lean back."],
-    feel:"Hamstrings (backs of the thighs) and glutes. Not your lower back.",
-    avoid:["Rounding your back. Stop higher if it starts to round.","Bending your knees into a squat.","The dumbbells drifting away from your legs."]},
-  "split":{steps:[
-    "Stand a long stride in front of a low step, chair or couch, facing away from it. Rest the top of your back foot on it, laces down.",
-    "Hold a wall or doorframe for balance until you're confident.",
-    "Keeping your torso upright (a slight forward lean is fine), lower straight down by bending your front knee until your front thigh is about level with the floor and your back knee is close to it.",
-    "Push through your whole front foot, especially the heel, to stand back up. Do all reps on one leg, then switch. If your front heel lifts, move your front foot further forward."],
-    feel:"Front of the front thigh and the front-leg glute.",
-    avoid:["Your front knee caving inwards.","Pushing off with the back foot.","Bouncing at the bottom."]},
-  "calf":{steps:[
-    "Stand on one foot on the edge of a step, ball of the foot on the step and heel hanging off. Hold a rail or wall lightly for balance, with a dumbbell in the same-side hand once bodyweight gets easy.",
-    "Lower your heel slowly (2 seconds) as far as is comfortable, to stretch the calf.",
-    "Rise as high as you can onto the ball of your foot and hold the top for one second.",
-    "Keep the knee straight but not locked."],
-    feel:"Calf and Achilles, which protects them for tennis.",
-    avoid:["Bouncing at the bottom.","Rushing the reps.","Pulling yourself up with the rail."]}
-};
 function howBlock(e){
   const h=HOW[e.id];const det=el("details",{class:"how"},el("summary",{},"How to do it"));
   if(!h)return det;
@@ -231,36 +19,6 @@ function howBlock(e){
   return det;
 }
 
-/* ---------- dumbbell plates ----------
-   Kit: two spin-lock handles (1.6 kg each with collars) and the plates below. Plates go
-   on in matching pairs (same on each side), so loading both dumbbells the same allows
-   a quarter of each plate size per side; a single dumbbell can take half. */
-const PLATE_TYPES=[{key:"big",kg:2.5,count:8},{key:"mid",kg:1.25,count:4},{key:"small",kg:0.5,count:4}];
-const DEFAULT_HANDLE_KG=1.6;
-function handleKg(){try{const v=parseFloat(localStorage.getItem("tft:handle-kg"));return v>0&&v<10?v:DEFAULT_HANDLE_KG}catch(e){return DEFAULT_HANDLE_KG}}
-function setHandleKg(v){try{localStorage.setItem("tft:handle-kg",String(v))}catch(e){}}
-const perSideMax=(kit,t)=>Math.floor(t.count/(kit==="one"?2:4));
-const emptyLoad=()=>Object.fromEntries(PLATE_TYPES.map(t=>[t.key,0]));
-function loadKg(l){return handleKg()+2*PLATE_TYPES.reduce((a,t)=>a+(l[t.key]||0)*t.kg,0)}
-// every way to load one dumbbell for this kit (pair or single)
-function allLoads(kit){
-  let out=[emptyLoad()];
-  for(const t of PLATE_TYPES){const m=perSideMax(kit,t),next=[];for(const l of out)for(let n=0;n<=m;n++)next.push({...l,[t.key]:n});out=next}
-  return out;
-}
-// best loading for a target weight per dumbbell: closest, then fewest plates
-function bestLoad(target,kit){
-  let best=null;
-  for(const l of allLoads(kit)){
-    const d=Math.abs(loadKg(l)-target),n=PLATE_TYPES.reduce((a,t)=>a+l[t.key],0);
-    if(!best||d<best.d-1e-9||(Math.abs(d-best.d)<1e-9&&n<best.n))best={l,d,n};
-  }
-  return best.l;
-}
-function reachable(kit){return [...new Set(allLoads(kit).map(l=>Math.round(loadKg(l)*100)/100))].sort((a,b)=>a-b)}
-// the next heavier weight your plates allow, or null at the limit
-const nextLoadKg=(kg,kit)=>reachable(kit).find(v=>v>kg+0.05)??null;
-const sideText=l=>{const p=PLATE_TYPES.flatMap(t=>Array(l[t.key]||0).fill(String(t.kg)));return p.length?p.join(" + ")+" each side":"no plates"};
 
 function dumbbellSVG(l){
   const W=320,H=96,cx=W/2,mk=svgEl;
@@ -312,32 +70,38 @@ function renderCalc(){
       el("div",{class:"field"},el("input",{type:"number",id:"calc-handle",inputmode:"decimal",step:"0.05",min:"0.5",max:"9",value:handleKg(),
         onchange:e=>{const v=parseFloat(e.target.value);if(v>0&&v<10){setHandleKg(v);e.target.blur();requestAnimationFrame(()=>{renderCalc();if(S.tab==="log")renderLog()})}}}),el("i",{},"kg"))));
 }
+const kitOf=st=>st&&st.kit==="one"?"one":"pair";
+// the next weight for an exercise, or null at the plates' limit or the exercise's own cap
+const nextUp=(e,kg,kit)=>{const n=nextLoadKg(kg,kit);return n!=null&&(e.cap==null||n<=e.cap+0.01)?n:null};
 function stationKg(day,stId){
-  // the weight you last used for the station's first weighted exercise, else the plan default
+  // the weight for the station's first weighted exercise: last time's, or the next one up
+  // if every set hit the top of its range, else the plan default
   const st=PLAN[day].stations[stId];if(!st||st.kit==="none")return null;
-  const lead=PLAN[day].ex.find(e=>e.st===stId&&e.load==="kg");
+  const kit=kitOf(st),lead=PLAN[day].ex.find(e=>e.st===stId&&e.load==="kg");
   const last=lead&&lastFor(lead.id,S.date,sid());
-  const kgs=last?doneSets(last.entries[lead.id]).map(s=>s.kg).filter(v=>v!=null):[];
-  const target=kgs.length?Math.max(...kgs):st.kg;
-  return loadKg(bestLoad(target,st.kit==="one"?"one":"pair"));
+  const kgs=last?doneSets(last.entries[lead.id]).map(s=>s.kg).filter(v=>v!=null&&v>0):[];
+  if(!kgs.length)return snapKg(st.kg,kit);
+  const top=Math.max(...kgs);
+  return (readyToProgress(lead,last)===true&&nextUp(lead,top,kit))||snapKg(top,kit);
 }
 function stationHeader(day,stId,first){
   const st=PLAN[day].stations[stId];
   if(st.kit==="none")return el("div",{class:"station"},el("span",{class:"st-tag"},first?"Start":"Change"),el("div",{class:"st-main"},el("b",{},st.label),st.note?el("span",{},st.note):null));
-  const kg=stationKg(day,stId),kit=st.kit==="one"?"one":"pair",l=bestLoad(kg,kit);
+  const kg=stationKg(day,stId),kit=kitOf(st),l=bestLoad(kg,kit);
   return el("div",{class:"station"},
     el("span",{class:"st-tag"},first?"Start":"Change"),
-    el("div",{class:"st-main"},el("b",{},`${st.label} · ${fmtKg(kg)} kg`),el("span",{},(s=>s[0].toUpperCase()+s.slice(1))(sideText(l))+"."+(st.note?" "+st.note:""))),
+    el("div",{class:"st-main"},el("b",{},st.label+" · ",el("span",{class:"nw"},fmtKg(kg)+" kg")),el("span",{},(s=>s[0].toUpperCase()+s.slice(1))(sideText(l))+"."+(st.note?" "+st.note:""))),
     el("button",{type:"button",class:"btn st-btn",onclick:()=>openCalc(kg,kit)},"Plates"));
 }
 
-const ORDER = ["push","pull","upper"];
-const EX = {}; ORDER.forEach(d=>PLAN[d].ex.forEach(e=>EX[e.id]={...e,day:d}));
 
 
-function defaultDay(){const dow=new Date().getDay();for(let i=0;i<7;i++){const d=(dow+i)%7;const hit=ORDER.find(k=>PLAN[k].dow===d);if(hit)return hit}return "push"}
+const ROTATION=ORDER.map(k=>({key:k,dow:PLAN[k].dow}));
+const todayIso=()=>iso(new Date());
+// the workout that's due: the next in the rotation, so a missed day is caught up (see lib/rotation.js)
+function defaultDay(sessions){return dueDay(ROTATION,Object.values(sessions||{}),todayIso(),new Date().getDay())}
 
-const S = {tab:"log",day:defaultDay(),date:iso(new Date()),autoDate:true,sessions:{},body:{},play:{},db:null,draft:null,dirty:false,timer:null,confirmClear:false};
+const S = {tab:"log",day:defaultDay(),date:iso(new Date()),autoDate:true,autoDay:true,sessions:{},body:{},play:{},db:null,draft:null,dirty:false,timer:null,confirmClear:false};
 
 /* ---------- storage ---------- */
 function setStatus(t,ok){const s=$("#status");s.textContent=t;s.classList.toggle("ok",!!ok)}
@@ -362,21 +126,16 @@ function saveNow(){
 
 /* ---------- history helpers ---------- */
 function sessionsSorted(){return Object.values(S.sessions).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0)}
-function doneSets(entry){return (entry||[]).filter(s=>s&&s.done)}
 function lastFor(exId,beforeDate,excludeId){
   const list=sessionsSorted().filter(s=>(s.date+"_"+s.day)!==excludeId&&s.date<=beforeDate&&doneSets(s.entries&&s.entries[exId]).length);
   return list.length?list[list.length-1]:null;
-}
-function readyToProgress(e,sess){
-  if(e.hi==null)return null;
-  const sets=doneSets(sess.entries[e.id]);
-  if(sets.length<e.sets)return false;
-  return sets.slice(0,e.sets).every(s=>(s.reps??0)>=e.hi);
 }
 
 /* ---------- rest timer ---------- */
 let audio=null;
 function beep(){try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=880;g.gain.setValueAtTime(.001,audio.currentTime);g.gain.exponentialRampToValueAtTime(.25,audio.currentTime+.02);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.5);o.connect(g).connect(audio.destination);o.start();o.stop(audio.currentTime+.55)}catch(e){}}
+// a silent phone gives no beep, so the whole screen pulses when the rest is up
+function flash(){const f=$("#flash");if(!f)return;f.classList.remove("go");void f.offsetWidth;f.classList.add("go")}
 function startTimer(secs,label){
   try{audio=audio||new (window.AudioContext||window.webkitAudioContext)()}catch(e){}
   S.timer={end:Date.now()+secs*1000,total:secs,label,beeped:false};
@@ -390,7 +149,7 @@ function tick(){
   $("#timer-lbl").textContent=left>0?"Rest · next: "+t.label:"Rest's up. Go again.";
   $("#timer").classList.toggle("over",left<=0);
   $("#timer-bar").style.width=Math.max(0,Math.min(100,(1-left/t.total)*100))+"%";
-  if(left<=0&&!t.beeped){t.beeped=true;beep()}
+  if(left<=0&&!t.beeped){t.beeped=true;beep();flash()}
   if(left<-300){stopTimer();return}
   clearTimeout(t.h);t.h=setTimeout(tick,250);
 }
@@ -408,13 +167,17 @@ function renderLog(){
   const rt=recentTennis();
   if(rt)m.append(el("div",{class:"notice"},el("b",{},(rt.date===iso(new Date())?"Tennis today: ":"Tennis last night: ")+fmtDur(rt.durationMin)+", "+fmtInt(rt.activeKcal)+" kcal. "),
     "Eat a little extra today to stay in surplus"+(S.day==="upper"?", and go easy on the legs block if they're heavy.":". Grip may be tired, so stop sets when form slips.")));
-  m.append(el("div",{class:"daybar"},ORDER.map(k=>el("button",{type:"button","aria-pressed":String(S.day===k),onclick:()=>{saveNow();S.day=k;loadDraft();renderLog()}},el("b",{},PLAN[k].name),el("span",{},PLAN[k].sub+" · ~"+PLAN[k].mins+" min")))));
+  m.append(el("div",{class:"daybar"},ORDER.map(k=>el("button",{type:"button","aria-pressed":String(S.day===k),onclick:()=>{saveNow();S.day=k;S.autoDay=false;loadDraft();renderLog()}},el("b",{},PLAN[k].name),el("span",{},PLAN[k].sub.slice(0,3)+" · "+PLAN[k].mins+" min")))));
   const p=PLAN[S.day];
   m.append(el("div",{class:"daterow"},
-    el("label",{for:"sess-date"},"Session date ",el("input",{type:"date",id:"sess-date",value:S.date,max:iso(new Date()),onchange:e=>{if(e.target.value){saveNow();S.date=e.target.value;S.autoDate=S.date===iso(new Date());loadDraft();renderLog()}}})),
-    el("span",{},S.sessions[sid()]?"Logged · edits save automatically":"Ticks save automatically"),
+    el("label",{for:"sess-date"},el("span",{class:"sr"},"Session date"),el("input",{type:"date",id:"sess-date",value:S.date,max:todayIso(),onchange:e=>{if(e.target.value){saveNow();S.date=e.target.value;S.autoDate=S.date===todayIso();loadDraft();renderLog()}}})),
     el("button",{type:"button",class:"btn quiet",onclick:()=>openCalc(null,"pair")},"Plate calculator")
   ));
+  const legacy=legacySessions();
+  if(legacy.length&&!lsGet("tft:legacy-dismissed",false))m.append(el("div",{class:"notice"},
+    el("b",{},"Earlier weights read high. "),`${legacy.length} session${legacy.length===1?" was":"s were"} logged when the app assumed 2 kg handles, so ${legacy.length===1?"its":"their"} weights are ${fmtKg(2-handleKg())} kg too high per dumbbell. Correcting them keeps your charts and “last time” numbers true.`,
+    el("div",{class:"row"},el("button",{type:"button",class:"btn primary",onclick:fixLegacy},"Correct them"),
+      el("button",{type:"button",class:"btn quiet",onclick:()=>{lsSet("tft:legacy-dismissed",true);renderLog()}},"Leave as is"))));
   m.append(el("div",{class:"sessbar",id:"sessbar","aria-live":"polite"}));
   p.ex.forEach((e,idx)=>{if(!idx||p.ex[idx-1].st!==e.st)m.append(stationHeader(S.day,e.st,!idx));m.append(exCard(e,p.ex[idx+1]))});
   m.append(el("section",{class:"panel sess-sum",id:"sess-sum",hidden:true}));
@@ -428,7 +191,20 @@ function renderLog(){
     ));
   }
   updateSession();
-  m.append(el("p",{class:"hint"},"Warm up 5–10 minutes first. Finish each set with 1–2 reps in the tank. Grey numbers are last session's; tick a set to accept them."+("wakeLock" in navigator?" The screen stays on while this tab is open.":"")));
+  m.append(el("p",{class:"hint"},"Warm up 5–10 minutes first. Finish each set with 1–2 reps in the tank. Grey numbers are your target, based on last session; tick a set to accept them. Everything saves automatically."+("wakeLock" in navigator?" The screen stays on while this tab is open.":"")));
+}
+// sessions holding weights logged under the old 2 kg handle assumption (see legacyKg)
+const legacySets=en=>Array.isArray(en)&&en.some(x=>x&&legacyKg(x.kg)!=null);
+function legacySessions(){return Object.entries(S.sessions).filter(([,s])=>s&&Object.values(s.entries||{}).some(legacySets))}
+function fixLegacy(){
+  saveNow();
+  const now=new Date().toISOString();
+  legacySessions().forEach(([id,s])=>{
+    const body=JSON.parse(JSON.stringify(s));
+    Object.values(body.entries).forEach(en=>{if(Array.isArray(en))en.forEach(x=>{const k=x&&legacyKg(x.kg);if(k!=null)x.kg=k})});
+    body.updatedAt=now;S.db.collection("sessions").doc(id).set(body);
+  });
+  loadDraft();renderLog();
 }
 function clearSession(){
   clearTimeout(saveT);S.dirty=false; // drop the pending save so it can't bring the session back
@@ -440,6 +216,11 @@ function exCard(e,next){
   const last=lastFor(e.id,S.date,sid());
   const lastSets=last?doneSets(last.entries[e.id]):[];
   const ready=last?readyToProgress(e,last):null;
+  const st=PLAN[S.day].stations[e.st],kit=kitOf(st),loadable=e.load==="kg"&&st&&st.kit!=="none";
+  const limit=ready===true&&atPlateLimit(e,last,S.day);
+  // ready to go up: the target becomes the next weight the plates allow, starting at the low end of the rep range
+  const upKg=ready===true&&loadable&&!limit?nextUp(e,Math.max(...lastSets.map(s=>s.kg??0)),kit):null;
+  const capped=ready===true&&loadable&&!limit&&upKg==null&&e.cap!=null;
   const entries=S.draft.entries[e.id]=S.draft.entries[e.id]||[];
   const target=e.hi==null?e.sets+" × max":e.sets+" × "+(e.lo===e.hi?e.hi:e.lo+"–"+e.hi);
   const lastTxt=last?(e.load==="kg"?lastSets.map(s=>fmtKg(s.kg)+"×"+(s.reps??"–")).join(", "):lastSets.map(s=>(s.kg?"+"+fmtKg(s.kg)+"kg×":"")+(s.reps??"–")).join(", ")):null;
@@ -447,7 +228,9 @@ function exCard(e,next){
     el("div",{class:"ex-top"},el("h2",{},e.n),el("span",{class:"target"},target)),
     el("div",{class:"specs"},el("span",{},"Start ",el("b",{},e.start)," ",e.unit),el("span",{},"Rest ",el("b",{},e.rest>=120?Math.floor(e.rest/60)+(e.rest%60?":"+String(e.rest%60).padStart(2,"0"):"")+" min":e.rest+" s"))),
     last?el("div",{class:"last"},el("span",{class:"num"},fmtShort(last.date)+": "+lastTxt),
-      ready===true?(atPlateLimit(e,last,S.day)?el("span",{class:"chip warn",title:"No heavier loading possible with your plates"},"At plate limit: add reps"):el("span",{class:"chip up"},e.load==="kg"?(()=>{const lk=Math.max(...lastSets.map(s=>s.kg??0)),st=PLAN[S.day].stations[e.st],nx=nextLoadKg(lk,st&&st.kit==="one"?"one":"pair");return nx?`Up to ${fmtKg(nx)} kg`:"Go up a step"})():"Make it harder")):ready===false?el("span",{class:"chip hold"},"Same again"):null)
+      ready===true?(limit?el("span",{class:"chip warn",title:"No heavier loading possible with your plates"},"At plate limit: add reps")
+        :capped?el("span",{class:"chip hold"},"Heavy enough: keep it controlled")
+        :el("span",{class:"chip up"},upKg!=null?`Up to ${fmtKg(upKg)} kg`:e.load==="kg"?"Go up a step":"Make it harder")):ready===false?el("span",{class:"chip hold"},"Same again"):null)
       :el("div",{class:"last"},"First time. Start at the low end and find your weight."),
   );
   if(e.pair&&EX[e.pair]){
@@ -460,10 +243,12 @@ function exCard(e,next){
     const cur=entries[i]||{kg:null,reps:null,done:false};
     const prev=lastSets[i]||lastSets[lastSets.length-1]||null;
     const stKg=e.load==="kg"&&e.st?stationKg(S.day,e.st):null;
-    const kgPh=prev&&prev.kg!=null?fmtKg(prev.kg):(e.load==="kg"?(stKg!=null?fmtKg(stKg):""):"–");
-    const repPh=prev&&prev.reps!=null?String(prev.reps):(e.hi==null?"":String(e.hi));
+    // targets are always weights the plates can make
+    const prevKg=prev&&prev.kg!=null?(loadable&&prev.kg>0?snapKg(prev.kg,kit):prev.kg):null;
+    const kgPh=upKg!=null?fmtKg(upKg):prevKg!=null?fmtKg(prevKg):(e.load==="kg"?(stKg!=null?fmtKg(stKg):""):"–");
+    const repPh=upKg!=null&&e.lo!=null?String(e.lo):prev&&prev.reps!=null?String(prev.reps):(e.hi==null?"":String(e.hi));
     const row=el("div",{class:"set"+(cur.done?" done":"")});
-    const kgIn=el("input",{type:"number",inputmode:"decimal",step:"0.5",min:"0",id:`kg-${e.id}-${i}`,"aria-label":`${e.n} set ${i+1} kilograms`,placeholder:kgPh,value:cur.kg??""});
+    const kgIn=el("input",{type:"number",inputmode:"decimal",step:"0.1",min:"0",id:`kg-${e.id}-${i}`,"aria-label":`${e.n} set ${i+1} kilograms`,placeholder:kgPh,value:cur.kg??""});
     const rIn=el("input",{type:"number",inputmode:"numeric",step:"1",min:"0",id:`reps-${e.id}-${i}`,"aria-label":`${e.n} set ${i+1} reps`,placeholder:repPh,value:cur.reps??""});
     const write=()=>{entries[i]={kg:num(kgIn.value),reps:num(rIn.value),done:row.classList.contains("done")};scheduleSave();updateSession()};
     kgIn.addEventListener("input",write);rIn.addEventListener("input",write);
@@ -482,87 +267,11 @@ function exCard(e,next){
   return card;
 }
 
-function sparkSVG(vals,w,h,pad){
-  const s=svgEl("svg",{viewBox:`0 0 ${w} ${h}`,class:"spark","aria-hidden":"true"});
-  const lo=Math.min(...vals),hi=Math.max(...vals),r=hi-lo||1;
-  const pts=vals.map((v,i)=>[pad+(vals.length===1?0:i*(w-2*pad)/(vals.length-1)),h-pad-((v-lo)/r)*(h-2*pad)]);
-  const L=pts[pts.length-1];
-  s.append(svgEl("polyline",{points:pts.map(p=>p.join(",")).join(" "),class:"ln s1"}),svgEl("circle",{cx:L[0],cy:L[1],r:2.8,class:"dot s1"}));
-  return s;
-}
 
-/* ---------- charts ----------
-   Charts are drawn at the real width of the screen (1 SVG unit = 1 CSS pixel), so
-   their labels stay at a readable size on a phone and don't balloon on a desktop. */
-function chartW(){
-  const m=$("#main");if(!m)return 340;
-  const cs=getComputedStyle(m);
-  return Math.round(Math.max(260,Math.min(620,m.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)-30)));
-}
-function niceStep(raw){const p=10**Math.floor(Math.log10(raw||1));for(const m of [1,2,2.5,5,10])if(m*p>=raw)return m*p;return 10*p}
-// series: [{name, cls:"s1"|"s2"|"s3", pts:[{t:"YYYY-MM-DD", v}]}]; band: {name, lo:[pts], hi:[pts]}
-function lineChart({series,band,fmt=(v,dec)=>v.toFixed(dec),zero=false,H=190,label}){
-  const W=chartW(),P={l:42,r:12,t:12,b:24};
-  const pts=[...series.flatMap(s=>s.pts),...(band?[...band.lo,...band.hi]:[])];
-  const ts=pts.map(p=>dayT(p.t)),t0=Math.min(...ts),t1=Math.max(...ts),tr=t1-t0||864e5;
-  let lo=Math.min(...pts.map(p=>p.v),...(zero?[0]:[])),hi=Math.max(...pts.map(p=>p.v),...(zero?[0]:[]));
-  if(hi-lo<1e-9){hi+=1;lo-=1}
-  const step=niceStep((hi-lo)/4);lo=Math.floor(lo/step)*step;hi=Math.ceil(hi/step)*step;
-  const X=t=>P.l+(dayT(t)-t0)/tr*(W-P.l-P.r),Y=v=>P.t+(hi-v)/(hi-lo)*(H-P.t-P.b);
-  const s=svgEl("svg",{viewBox:`0 0 ${W} ${H}`,width:W,height:H,class:"chart",role:"img","aria-label":label||""});
-  for(let v=lo;v<=hi+step/2;v+=step){
-    s.append(svgEl("line",{x1:P.l,x2:W-P.r,y1:Y(v),y2:Y(v),class:Math.abs(v)<1e-9&&zero?"grid zero":"grid"}));
-    const dec=step>=1?0:Math.abs(step*10-Math.round(step*10))<1e-9?1:2;
-    const t=svgEl("text",{x:P.l-6,y:Y(v)+4,"text-anchor":"end"});t.textContent=fmt(Math.round(v*100)/100,dec);s.append(t);
-  }
-  const firstT=pts.reduce((a,p)=>dayT(p.t)<dayT(a)?p.t:a,pts[0].t),lastT=pts.reduce((a,p)=>dayT(p.t)>dayT(a)?p.t:a,pts[0].t);
-  [[firstT,"start"],[lastT,"end"]].forEach(([t,anchor])=>{const x=svgEl("text",{x:anchor==="start"?P.l:W-P.r,y:H-6,"text-anchor":anchor});x.textContent=fmtShort(t);s.append(x)});
-  if(band){
-    const d="M"+band.lo.map(p=>X(p.t)+","+Y(p.v)).join("L")+"L"+band.hi.slice().reverse().map(p=>X(p.t)+","+Y(p.v)).join("L")+"Z";
-    s.append(svgEl("path",{d,class:"goalband"}));
-  }
-  series.forEach(se=>{
-    if(!se.pts.length)return;
-    const sorted=se.pts.slice().sort((a,b)=>dayT(a.t)-dayT(b.t));
-    if(sorted.length>1)s.append(svgEl("polyline",{points:sorted.map(p=>X(p.t)+","+Y(p.v)).join(" "),class:"ln "+se.cls}));
-    sorted.forEach((p,i)=>s.append(svgEl("circle",{cx:X(p.t),cy:Y(p.v),r:i===sorted.length-1?4.5:2.5,class:"dot "+se.cls})));
-  });
-  const wrap=el("div",{class:"chartwrap"},s);
-  const legend=[...series.map(se=>[se.cls,se.name]),...(band?[["band",band.name]]:[])].filter(x=>x[1]);
-  if(legend.length>1||band)wrap.append(el("div",{class:"legend"},legend.map(([c,n])=>el("span",{},el("i",{class:"key "+c}),n))));
-  return wrap;
-}
-
-/* ---------- strength maths ----------
-   Estimated one-rep max (Epley): weight × (1 + reps ÷ 30). It rises when you add
-   weight OR reps, which matters here because shared-weight stations progress by reps. */
-const e1rm=s=>s&&s.kg!=null&&s.reps?s.kg*(1+s.reps/30):null;
-function sessionScore(e,sess){
-  const sets=doneSets(sess.entries&&sess.entries[e.id]);if(!sets.length)return null;
-  if(e.load==="kg"){const v=sets.map(e1rm).filter(v=>v!=null);return v.length?Math.max(...v):null}
-  const r=sets.map(s=>s.reps).filter(v=>v!=null);return r.length?Math.max(...r):null;
-}
-function bestSet(e,sess){
-  const sets=doneSets(sess.entries&&sess.entries[e.id]);if(!sets.length)return null;
-  return sets.reduce((a,s)=>(e.load==="kg"?(e1rm(s)||0)>(e1rm(a)||0):(s.reps||0)>(a.reps||0))?s:a,sets[0]);
-}
-function allExercises(){return ORDER.flatMap(d=>PLAN[d].ex)}
-function strengthSeries(){
-  // average % change of every lift against its own first session, after each training day
-  const base={},latest={},out=[];
-  sessionsSorted().forEach(sess=>{
-    let touched=false;
-    allExercises().forEach(e=>{const v=sessionScore(e,sess);if(v==null)return;if(base[e.id]==null)base[e.id]=v;latest[e.id]=v;touched=true});
-    if(!touched)return;
-    const ids=Object.keys(base);const pct=ids.reduce((a,id)=>a+(latest[id]/base[id]-1),0)/ids.length*100;
-    const prev=out[out.length-1];if(prev&&prev.t===sess.date)prev.v=pct;else out.push({t:sess.date,v:pct});
-  });
-  return out;
-}
-const plateMax=kit=>Math.max(...reachable(kit));
+const strengthSeries=()=>strengthSeriesOf(sessionsSorted(),allExercises());
 function atPlateLimit(e,sess,day){
   if(e.load!=="kg"||!sess)return false;
-  const st=PLAN[day]&&PLAN[day].stations[e.st];const kit=st&&st.kit==="one"?"one":"pair";
+  const kit=kitOf(PLAN[day]&&PLAN[day].stations[e.st]);
   const kgs=doneSets(sess.entries[e.id]).map(s=>s.kg).filter(v=>v!=null);
   return kgs.length>0&&Math.max(...kgs)>=plateMax(kit)-0.01;
 }
@@ -652,13 +361,7 @@ function sessionStats(){
   p.ex.forEach(e=>{const d=doneSets(entries[e.id]).length;total+=e.sets;done+=Math.min(d,e.sets);if(d>=e.sets)exDone++});
   return {total,done,exDone,exTotal:p.ex.length,vol:sessionVolume({entries},S.day)};
 }
-// kg × reps over completed sets; "per hand" exercises count both dumbbells
-function sessionVolume(sess,day,only){
-  let v=0;
-  PLAN[day].ex.filter(e=>e.load==="kg"&&(!only||only.has(e.id))).forEach(e=>
-    doneSets(sess.entries&&sess.entries[e.id]).forEach(s=>{if(s.kg!=null&&s.reps)v+=s.kg*s.reps*(e.unit==="per hand"?2:1)}));
-  return v;
-}
+const sessionVolume=(sess,day,only)=>volume(sess,PLAN[day].ex,only);
 function updateSession(){
   const bar=$("#sessbar"),sum=$("#sess-sum");if(!bar||!sum)return;
   const st=sessionStats();
@@ -674,7 +377,7 @@ function updateSession(){
     const v=sessionScore(e,cur);if(v==null)return;
     const before=history.map(s=>sessionScore(e,s)).filter(x=>x!=null);
     if(before.length&&v>Math.max(...before)+1e-9){const b=bestSet(e,cur);bests.push(e.load==="kg"?`${e.n} (${fmtKg(b.kg)} × ${b.reps})`:`${e.n} (${b.reps} reps)`)}
-    if(readyToProgress(e,cur)===true)(atPlateLimit(e,cur,S.day)?limits:ready).push(e.n);
+    if(readyToProgress(e,cur)===true&&e.cap==null)(atPlateLimit(e,cur,S.day)?limits:ready).push(e.n);
   });
   const items=[];
   if(st.vol)items.push(el("li",{},el("b",{},"Total lifted: "),`${fmtInt(st.vol)} kg`+(prevSame?(()=>{
@@ -709,7 +412,7 @@ function renderBody(){
     el("label",{class:"check full",for:"b-photo"},el("input",{type:"checkbox",id:"b-photo",checked:!!cur.photo}),"Progress photo taken (every 4 weeks)"),
     el("div",{class:"row full"},el("button",{type:"submit",class:"btn primary"},"Save entry"),el("span",{class:"hint",id:"b-msg","aria-live":"polite"}))
   );
-  m.append(el("section",{class:"panel"},el("h2",{},"Log measurements"),el("p",{class:"hint"},"Weigh in weekly, same time of day. Measure arms and chest monthly."),form));
+  m.append(el("section",{class:"panel"},el("h2",{},"Log measurements"),el("p",{class:"hint"},"Weigh in weekly, same time of day. Measure arms and chest monthly. Weigh-ins saved in Apple Health arrive here on their own if Health Auto Export is set to send Weight."),form));
   m.append(el("div",{id:"body-lists",class:"stack"}));
   renderBodyLists();
 }
@@ -801,7 +504,7 @@ function weeklyChart(weeks){
   weeks.forEach((w,i)=>{const h=w.min/60,x=P.l+i*bw+bw*.18,wd=bw*.64;
     if(h>0)s.append(mk("rect",{x,y:Y(h),width:wd,height:Y(0)-Y(h),rx:3,class:i===weeks.length-1?"wbar now":"wbar"}));
     if(w.n){const t=mk("text",{x:x+wd/2,y:Y(h)-5,"text-anchor":"middle"});t.textContent=w.n+"×";s.append(t)}
-    const t=mk("text",{x:x+wd/2,y:H-6,"text-anchor":"middle"});t.textContent=i===weeks.length-1?"Now":shortDM(w.start);s.append(t)});
+    if(bw>=46||(weeks.length-1-i)%2===0){const t=mk("text",{x:x+wd/2,y:H-6,"text-anchor":"middle"});t.textContent=i===weeks.length-1?"Now":shortDM(w.start);s.append(t)}});
   return s;
 }
 
@@ -872,7 +575,7 @@ async function importHealthFile(file){
    The subscription and plan are re-sent on each launch, so the server always has this
    phone's current address and the reminder knows each day's lifts. */
 const planSnapshot=()=>({days:ORDER.map(k=>({dow:PLAN[k].dow,key:k,name:PLAN[k].name,mins:PLAN[k].mins,
-  ex:PLAN[k].ex.map(e=>({id:e.id,n:e.n,sets:e.sets,hi:e.hi,load:e.load}))}))});
+  ex:PLAN[k].ex.map(e=>({id:e.id,n:e.n,sets:e.sets,hi:e.hi,load:e.load,...(e.cap!=null?{cap:e.cap}:{})}))}))});
 const DAY_NAMES=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const gymDays=()=>{const d=ORDER.map(k=>PLAN[k].dow).sort().map(i=>DAY_NAMES[i]);return d.slice(0,-1).join(", ")+" and "+d[d.length-1]};
 const isStandalone=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
@@ -968,7 +671,8 @@ function drawRemind(){
 const HASH_TAB={train:"log",play:"play",progress:"progress",body:"body"},TAB_HASH={log:"train",play:"play",progress:"progress",body:"body"};
 function setTab(t){S.tab=t;try{localStorage.setItem("tab",t)}catch(e){}
   try{history.replaceState(null,"","#"+TAB_HASH[t])}catch(e){}
-  if(t==="log")loadDraft();render();window.scrollTo(0,0)}
+  const draw=()=>{if(t==="log")loadDraft();render();window.scrollTo(0,0)};
+  if(document.startViewTransition&&!matchMedia("(prefers-reduced-motion: reduce)").matches)document.startViewTransition(draw);else draw()}
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 try{const t=localStorage.getItem("tab");if(t&&TAB_HASH[t])S.tab=t}catch(e){}
 {const h=location.hash.slice(1);if(HASH_TAB[h])S.tab=HASH_TAB[h]}
@@ -1130,6 +834,7 @@ Sync.subs.push(()=>{
   const a=document.activeElement;const typing=!!a&&a.tagName==="INPUT"&&a.type!=="date"&&a.type!=="checkbox";
   const canReload=!S.dirty&&!(S.tab==="log"&&typing);
   if(firstData||canReload){
+    if(S.autoDay&&S.autoDate)S.day=defaultDay(S.sessions);
     loadDraft();
     if(S.tab==="log"){const y=window.scrollY;renderLog();window.scrollTo(0,y)}
     else if(S.tab==="progress")renderProgress();
@@ -1137,7 +842,16 @@ Sync.subs.push(()=>{
     else if(!typing)renderBodyLists();
   }
   firstData=false;
+  updateBadge();
 });
+
+/* A dot on the Home Screen icon on a gym day until a set is logged (iPhone needs
+   notifications allowed for this; elsewhere it's simply skipped). */
+function updateBadge(){
+  if(!("setAppBadge" in navigator))return;
+  const gymDay=ROTATION.some(d=>d.dow===new Date().getDay());
+  try{(gymDay&&!trainedOn(Object.values(S.sessions),todayIso())?navigator.setAppBadge(1):navigator.clearAppBadge()).catch(()=>{})}catch(e){}
+}
 
 $("#banner-btn").onclick=()=>{
   // a full page load (bypassing the offline copy) lets Cloudflare show the sign-in screen
@@ -1149,7 +863,8 @@ document.addEventListener("visibilitychange",()=>{
   else{
     // the app can sit in memory for days; move to today's session unless a date was picked by hand
     const today=iso(new Date());
-    if(S.autoDate&&S.date!==today){saveNow();S.date=today;S.day=defaultDay();loadDraft();render()}
+    if(S.autoDate&&S.date!==today){saveNow();S.date=today;S.autoDay=true;S.day=defaultDay(S.sessions);loadDraft();render()}
+    updateBadge();
     refresh();
   }
   syncWake();

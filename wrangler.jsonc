@@ -3,6 +3,8 @@
   "name": "rker",
   "compatibility_date": "2026-08-01",
   "main": "worker/index.js",
+  // Before each deploy: run the tests, then stamp the tracker's cache version (scripts/build.mjs)
+  "build": { "command": "node scripts/build.mjs" },
   "assets": {
     "directory": ".",
     "binding": "ASSETS",

@@ -14,22 +14,25 @@
 <meta name="apple-mobile-web-app-title" content="Tennis Fitness">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="/pwa/tennis-fitness/apple-touch-icon.png?v=2">
+<link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/pwa/tennis-fitness/splash/1320x2868.png">
+<link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/pwa/tennis-fitness/splash/1290x2796.png">
+<link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/pwa/tennis-fitness/splash/1284x2778.png">
+<link rel="apple-touch-startup-image" media="(device-width: 420px) and (device-height: 912px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/pwa/tennis-fitness/splash/1260x2736.png">
+<link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/pwa/tennis-fitness/splash/1242x2688.png">
+<link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="/pwa/tennis-fitness/splash/828x1792.png">
+<link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/pwa/tennis-fitness/splash/1206x2622.png">
+<link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/pwa/tennis-fitness/splash/1179x2556.png">
+<link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/pwa/tennis-fitness/splash/1170x2532.png">
+<link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/pwa/tennis-fitness/splash/1125x2436.png">
+<link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="/pwa/tennis-fitness/splash/750x1334.png">
 <link rel="icon" href="/pwa/tennis-fitness/icon.svg?v=2" type="image/svg+xml">
 <link rel="preload" href="/log/fonts/barlow-condensed-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/log/app.css?v=14">
-<script src="/log/app.js?v=14" defer></script>
+<link rel="stylesheet" href="/log/app.css?v=dev">
+<script type="module" src="/log/app.js?v=dev"></script>
 </head>
 <body>
 <header>
-  <div class="wrap">
-    <div class="head"><h1>Tennis Fitness Tracker</h1><span class="status" id="status" role="status">Loading…</span></div>
-    <nav role="tablist">
-      <button role="tab" id="tab-log" data-tab="log" aria-controls="main" aria-selected="true">Train</button>
-      <button role="tab" id="tab-play" data-tab="play" aria-controls="main" aria-selected="false">Play</button>
-      <button role="tab" id="tab-progress" data-tab="progress" aria-controls="main" aria-selected="false">Progress</button>
-      <button role="tab" id="tab-body" data-tab="body" aria-controls="main" aria-selected="false">Body</button>
-    </nav>
-  </div>
+  <div class="wrap head"><h1>Tennis Fitness Tracker</h1><span class="status" id="status" role="status">Loading…</span></div>
 </header>
 <div class="banner" id="banner" hidden>
   <div class="wrap banner-in">
@@ -42,6 +45,19 @@
   <div class="calc-head"><h2 id="calc-title">Plate calculator</h2><button type="button" class="btn" id="calc-close">Done</button></div>
   <div class="calc-body" id="calc-body"></div>
 </dialog>
+<nav role="tablist" aria-label="Sections">
+  <div class="wrap tabs">
+    <button role="tab" id="tab-log" data-tab="log" aria-controls="main" aria-selected="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5v5M6.5 7v10M17.5 7v10M21 9.5v5M6.5 12h11"/></svg>Train</button>
+    <button role="tab" id="tab-play" data-tab="play" aria-controls="main" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M5.8 6.2c3 2.6 3 9 0 11.6M18.2 6.2c-3 2.6-3 9 0 11.6"/></svg>Play</button>
+    <button role="tab" id="tab-progress" data-tab="progress" aria-controls="main" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5h16M5.5 15l4.5-5 3.5 3 5-6.5"/></svg>Progress</button>
+    <button role="tab" id="tab-body" data-tab="body" aria-controls="main" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 9a5 5 0 0 1 7 0M12 9.5l1.6-2"/></svg>Body</button>
+  </div>
+</nav>
+<div id="flash" aria-hidden="true"></div>
 <div class="timer" id="timer" hidden>
   <div class="bar" id="timer-bar"></div>
   <div class="in">
