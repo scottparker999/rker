@@ -47,10 +47,10 @@ A private, installable training log. Cloudflare Access protects `/log` and
   Push notification on training days. `worker/push.js` does the VAPID signing
   and message encryption with WebCrypto; the server's push key is created in
   and never leaves the Durable Object. Tests: `node --test worker/*.test.mjs`.
+  The app re-registers its subscription on every launch, and the Worker keeps the
+  result of the last send (`GET /api/log/push` → `last`), which the Progress tab
+  shows, so a refused or expired push is visible instead of silent.
 
 **When changing `log/app.js`, `log/app.css` or the fonts:** bump the `?v=`
 number in `log/index.html` and the matching `VERSION` and `?v=` entries in
 `log/sw.js`, so installed copies pick up the new files.
-  The app re-registers its subscription on every launch, and the Worker keeps the
-  result of the last send (`GET /api/log/push` → `last`), which the Progress tab
-  shows, so a refused or expired push is visible instead of silent.
