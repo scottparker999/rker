@@ -56,18 +56,33 @@ const storeOf = (env) => env.STORE.get(env.STORE.idFromName("main"));
 export async function sendReminders(env, { force }) {
   const store = storeOf(env);
   const [data, plan, subs, vapid] = await Promise.all([store.all(), store.getPlan(), store.listSubs(), store.vapid()]);
-  if (!subs.length) return { sent: 0, reason: "no subscriptions" };
+  if (!subs.length) return { sent: 0, reason: "no device is subscribed" };
   const msg = buildReminder(data, plan, Date.now(), { force });
   if (!msg) return { sent: 0, reason: "not a training day, or already trained" };
+  // Declarative Web Push (iPhone 18.4+ shows it without waking the service worker);
+  // the plain title/body/url fields are for the service worker everywhere else.
+  const payload = {
+    web_push: 8030,
+    notification: { title: msg.title, body: msg.body, navigate: PUSH_SUBJECT + msg.url, tag: msg.tag },
+    ...msg,
+  };
   let sent = 0;
+  const failed = [];
   for (const sub of subs) {
+    const host = new URL(sub.endpoint).hostname;
     try {
-      const r = await sendPush(sub, msg, vapid, PUSH_SUBJECT);
-      if (r.ok) sent++;
-      else if (r.gone) await store.removeSub(sub.endpoint);
-    } catch {}
+      const r = await sendPush(sub, payload, vapid, PUSH_SUBJECT);
+      if (r.ok) { sent++; continue; }
+      if (r.gone) await store.removeSub(sub.endpoint);
+      failed.push({ host, status: r.status, reason: r.gone ? "subscription expired" : r.reason });
+    } catch (e) {
+      failed.push({ host, status: 0, reason: String((e && e.message) || e).slice(0, 160) });
+    }
   }
-  return { sent, title: msg.title };
+  // kept so the app can show whether the last reminder actually went out
+  const result = { at: new Date().toISOString(), test: !!force, sent, failed, title: msg.title };
+  await store.setLastPush(result);
+  return result;
 }
 
 function validSubscription(sub, env) {
@@ -139,10 +154,10 @@ export async function handleApi(request, env) {
     return json({ ok: true, applied: res.applied }, 200);
   }
 
-  // Reminders: GET /api/log/push · POST /api/log/push/{subscribe,unsubscribe,plan,test}
+  // Reminders: GET /api/log/push · POST /api/log/push/{subscribe,unsubscribe,test}
   if (parts[0] === "push") {
     if (parts.length === 1 && request.method === "GET") {
-      return json({ publicKey: (await store.vapid()).publicKey, devices: (await store.listSubs()).length }, 200);
+      return json({ publicKey: (await store.vapid()).publicKey, devices: (await store.listSubs()).length, last: await store.getLastPush() }, 200);
     }
     if (parts.length !== 2 || request.method !== "POST") return json({ error: "Not found" }, 404);
     const raw = await request.text();
@@ -159,11 +174,6 @@ export async function handleApi(request, env) {
     if (parts[1] === "unsubscribe") {
       if (typeof body.endpoint !== "string") return json({ error: "Bad endpoint" }, 400);
       await store.removeSub(body.endpoint);
-      return json({ ok: true }, 200);
-    }
-    if (parts[1] === "plan") {
-      if (!validPlan(body.plan)) return json({ error: "Bad plan" }, 400);
-      await store.setPlan(body.plan);
       return json({ ok: true }, 200);
     }
     if (parts[1] === "test") return json(await sendReminders(env, { force: true }), 200);
@@ -279,6 +289,8 @@ export class LogStore extends DurableObject {
   }
   getPlan() { return this.getMeta("plan"); }
   setPlan(plan) { this.setMeta("plan", plan); }
+  getLastPush() { return this.getMeta("lastPush"); }
+  setLastPush(r) { this.setMeta("lastPush", r); }
   listSubs() { return this.sql.exec(`SELECT sub FROM push_subs`).toArray().map((r) => JSON.parse(r.sub)); }
   addSub(sub) {
     this.sql.exec(`INSERT OR REPLACE INTO push_subs (endpoint, sub, created) VALUES (?, ?, ?)`,

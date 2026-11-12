@@ -70,8 +70,9 @@ export async function encryptPayload(subscription, payload) {
 }
 
 /**
- * Sends one notification. Resolves to { ok, gone, status }: `gone` means the
- * subscription has been withdrawn (404/410) and should be deleted.
+ * Sends one notification. Resolves to { ok, gone, status, reason }: `gone` means the
+ * subscription has been withdrawn (404/410) and should be deleted; `reason` is the
+ * push service's own explanation when it refuses (e.g. Apple's "BadJwtToken").
  */
 export async function sendPush(subscription, message, vapid, subject) {
   const body = await encryptPayload(subscription, JSON.stringify(message));
@@ -86,5 +87,7 @@ export async function sendPush(subscription, message, vapid, subject) {
     },
     body,
   });
-  return { ok: res.ok, gone: res.status === 404 || res.status === 410, status: res.status };
+  let reason = "";
+  if (!res.ok) { try { reason = (await res.text()).replace(/\s+/g, " ").slice(0, 160); } catch {} }
+  return { ok: res.ok, gone: res.status === 404 || res.status === 410, status: res.status, reason };
 }

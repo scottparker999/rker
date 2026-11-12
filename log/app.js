@@ -869,45 +869,56 @@ async function importHealthFile(file){
 
 /* ---------- gym-day reminders (Web Push) ----------
    The phone subscribes once; the Worker sends the 8am reminder on training days.
-   The plan is uploaded with the subscription so the reminder knows each day's lifts. */
+   The subscription and plan are re-sent on each launch, so the server always has this
+   phone's current address and the reminder knows each day's lifts. */
 const planSnapshot=()=>({days:ORDER.map(k=>({dow:PLAN[k].dow,key:k,name:PLAN[k].name,mins:PLAN[k].mins,
   ex:PLAN[k].ex.map(e=>({id:e.id,n:e.n,sets:e.sets,hi:e.hi,load:e.load}))}))});
 const DAY_NAMES=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const gymDays=()=>{const d=ORDER.map(k=>PLAN[k].dow).sort().map(i=>DAY_NAMES[i]);return d.slice(0,-1).join(", ")+" and "+d[d.length-1]};
 const isStandalone=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
 const b64uBytes=s=>Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")+"===".slice((s.length+3)%4)),c=>c.charCodeAt(0));
-const Remind={state:"checking",msg:""}; // checking | unsupported | install | denied | off | on
+const Remind={state:"checking",msg:"",key:null,devices:null,last:null}; // checking | unsupported | install | denied | off | on
 
+// the server's side of the story: its public key, how many devices it holds, and how the last send went
+async function remindServer(){
+  try{const r=await api("GET","/push");Remind.key=r.publicKey;Remind.devices=r.devices;Remind.last=r.last||null;return true}catch(e){return false}
+}
 async function remindCheck(){
   if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
     Remind.state=/iPhone|iPad/.test(navigator.userAgent)&&!isStandalone()?"install":"unsupported";return drawRemind();
   }
   if(Notification.permission==="denied"){Remind.state="denied";return drawRemind()}
-  try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();Remind.state=sub?"on":"off"}
-  catch(e){Remind.state="off"}
+  let sub=null;
+  try{const reg=await navigator.serviceWorker.ready;sub=await reg.pushManager.getSubscription()}catch(e){}
+  Remind.state=sub?"on":"off";
   drawRemind();
-  if(Remind.state==="on")syncPlan();
+  // fetched now so "Turn on" can subscribe straight from the tap (iPhone insists on that)
+  await remindServer();
+  // re-register on every launch: heals a subscription the server has lost or the phone has renewed
+  if(sub){try{await registerSub(sub);await remindServer()}catch(e){}}
+  drawRemind();
 }
-async function syncPlan(){
-  // re-upload the plan only when it has changed since the last upload
-  const json=JSON.stringify(planSnapshot());
-  if(lsGet("tft:plan-sent","")===json)return;
-  try{await api("POST","/push/plan",{plan:JSON.parse(json)});lsSet("tft:plan-sent",json)}catch(e){}
+async function registerSub(sub){
+  const plan=planSnapshot();
+  await api("POST","/push/subscribe",{subscription:sub.toJSON(),plan});
 }
 async function remindOn(){
   // ask first, straight from the tap: iPhone only allows the prompt from a direct user action
-  const perm=await Notification.requestPermission();
-  if(perm!=="granted"){Remind.state=perm==="denied"?"denied":"off";Remind.msg=perm==="denied"?"":"Notifications weren't allowed.";return drawRemind()}
-  Remind.msg="Turning on…";drawRemind();
+  let step="permission";
   try{
-    const reg=await navigator.serviceWorker.ready;
-    const {publicKey}=await api("GET","/push");
-    const sub=await reg.pushManager.getSubscription()||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uBytes(publicKey)});
-    const plan=planSnapshot();
-    await api("POST","/push/subscribe",{subscription:sub.toJSON(),plan});
-    lsSet("tft:plan-sent",JSON.stringify(plan));
+    const perm=await Notification.requestPermission();
+    if(perm!=="granted"){Remind.state=perm==="denied"?"denied":"off";Remind.msg=perm==="denied"?"":"Notifications weren't allowed.";return drawRemind()}
+    Remind.msg="Turning on…";drawRemind();
+    step="service worker";const reg=await navigator.serviceWorker.ready;
+    step="server key";if(!Remind.key&&!(await remindServer()))throw {kind:Sync.state==="signin"?"signin":"offline"};
+    step="subscribe";const sub=await reg.pushManager.getSubscription()||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uBytes(Remind.key)});
+    step="register";await registerSub(sub);
     Remind.state="on";Remind.msg="On. Use “Send a test” to check it arrives.";
-  }catch(e){Remind.msg=e&&e.kind==="signin"?"Sign in again, then try once more.":e&&e.kind==="offline"?"You're offline. Try again with a connection.":"Couldn't turn reminders on. Try again in a moment."}
+    remindServer().then(drawRemind);
+  }catch(e){
+    Remind.msg=e&&e.kind==="signin"?"Sign in again, then try once more.":e&&e.kind==="offline"?"You're offline. Try again with a connection."
+      :`Couldn't turn reminders on (${step}: ${(e&&(e.name||e.status||e.kind))||"error"}). Try again in a moment.`;
+  }
   drawRemind();
 }
 async function remindOff(){
@@ -919,11 +930,24 @@ async function remindOff(){
   }catch(e){Remind.msg="Couldn't turn reminders off. Try again in a moment."}
   drawRemind();
 }
+const pushFailText=f=>`${f.host.includes("apple")?"Apple":f.host.includes("google")?"Google":"The push service"} refused it (${f.status||"no response"}${f.reason?": "+f.reason:""})`;
 async function remindTest(){
   Remind.msg="Sending…";drawRemind();
-  try{const r=await api("POST","/push/test",{});Remind.msg=r.sent?"Sent. It should arrive within a few seconds.":"Nothing was sent: "+(r.reason||"no device is subscribed")+"."}
-  catch(e){Remind.msg="Couldn't send a test. Try again in a moment."}
+  try{
+    const r=await api("POST","/push/test",{});
+    Remind.msg=r.sent?"Sent. It should arrive within a few seconds. If it doesn't, check iPhone Settings → Notifications → Tennis Fitness, and that a Focus mode isn't hiding it."
+      :r.failed&&r.failed.length?"Not delivered. "+r.failed.map(pushFailText).join("; ")+"."
+      :"Nothing was sent: "+(r.reason||"no device is subscribed")+".";
+    await remindServer();
+  }catch(e){Remind.msg=e&&e.kind==="signin"?"Sign in again, then try once more.":"Couldn't send a test. Try again in a moment."}
   drawRemind();
+}
+function remindLastText(){
+  const l=Remind.last;if(!l||!l.at)return null;
+  const when=new Date(l.at).toLocaleString("en-AU",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});
+  const what=l.test?"test":"reminder";
+  if(l.sent)return `Last ${what} sent ${when}.`;
+  return `Last ${what} (${when}) wasn't delivered`+(l.failed&&l.failed[0]?": "+pushFailText(l.failed[0]):"")+".";
 }
 function drawRemind(){
   const box=$("#reminders");if(!box)return;box.replaceChildren(el("h2",{},"Gym-day reminders"));
@@ -934,8 +958,9 @@ function drawRemind(){
   else if(st==="denied")box.append(line(/iPhone|iPad/.test(navigator.userAgent)?"Notifications are blocked for this app. Turn them on in iPhone Settings → Notifications → Tennis Fitness, then come back here.":"Notifications are blocked for this site. Allow them in your browser's site settings, then reload."));
   else if(st==="off")box.append(line(`A notification at 8am on ${gymDays()}, with that day's workout and which lifts are ready to go up.`),
     el("div",{class:"row"},el("button",{type:"button",class:"btn primary",onclick:remindOn},"Turn on reminders")));
-  else box.append(line(`On: 8am on ${gymDays()}.`),
-    el("div",{class:"row"},el("button",{type:"button",class:"btn",onclick:remindTest},"Send a test"),el("button",{type:"button",class:"btn quiet",onclick:remindOff},"Turn off")));
+  else box.append(...[line(`On: 8am on ${gymDays()}.`),remindLastText()?line(remindLastText()):null,
+    Remind.devices===0?line("This phone isn't registered with the server yet. Turn reminders off and on again."):null,
+    el("div",{class:"row"},el("button",{type:"button",class:"btn",onclick:remindTest},"Send a test"),el("button",{type:"button",class:"btn quiet",onclick:remindOff},"Turn off"))].filter(Boolean));
   if(Remind.msg)box.append(el("p",{class:"hint","aria-live":"polite"},Remind.msg));
 }
 

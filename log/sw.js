@@ -1,10 +1,10 @@
 // Tennis Fitness Tracker service worker: keeps the app shell available offline.
 // Bump VERSION whenever app.css, app.js or the fonts change.
-const VERSION = "tft-v13";
+const VERSION = "tft-v14";
 const SHELL = [
   "/log/",
-  "/log/app.css?v=13",
-  "/log/app.js?v=13",
+  "/log/app.css?v=14",
+  "/log/app.js?v=14",
   "/log/fonts/barlow-condensed-latin-600-normal.woff2",
   "/log/fonts/barlow-condensed-latin-700-normal.woff2",
   "/log/fonts/ibm-plex-sans-latin-400-normal.woff2",
@@ -83,7 +83,13 @@ async function staleWhileRevalidate(event, req) {
 // Gym-day reminders sent by the Worker (see worker/reminder.js).
 self.addEventListener("push", (event) => {
   let m = { title: "Tennis Fitness", body: "", url: "/log/#train", tag: "gym-day" };
-  try { if (event.data) m = { ...m, ...event.data.json() }; } catch {}
+  try {
+    if (event.data) {
+      const d = event.data.json();
+      const n = d && d.notification; // declarative format, when the browser hands it to us instead
+      m = { ...m, ...d, ...(n ? { title: n.title, body: n.body, tag: n.tag || m.tag } : {}) };
+    }
+  } catch {}
   const url = typeof m.url === "string" && m.url.startsWith("/log/") ? m.url : "/log/";
   event.waitUntil(self.registration.showNotification(m.title, {
     body: m.body, tag: m.tag, icon: "/pwa/tennis-fitness/icon-192.png?v=2", data: { url },
