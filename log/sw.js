@@ -102,7 +102,7 @@ self.addEventListener("push", (event) => {
   } catch {}
   const url = typeof m.url === "string" && m.url.startsWith("/log/") ? m.url : "/log/";
   event.waitUntil(Promise.all([
-    self.registration.showNotification(m.title, { body: m.body, tag: m.tag, icon: "/pwa/tennis-fitness/icon-192.png?v=2", data: { url } }),
+    self.registration.showNotification(m.title, { body: m.body, tag: m.tag, icon: "/pwa/tennis-fitness/icon-192.png?v=3", data: { url } }),
     // mark the Home Screen icon until today's session is logged (the app clears it)
     self.navigator.setAppBadge ? self.navigator.setAppBadge(1).catch(() => {}) : null,
   ]));
